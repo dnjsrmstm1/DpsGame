@@ -126,32 +126,13 @@ function 강화비용(단계: number) {
   return 30 + 단계 * 20
 }
 
-// 강화 실패 페널티 결과 (강도 높을수록 가혹)
-// 파괴방지: 특수파괴방지 + 특수파괴방지2 합산 포인트 (포인트당 0.1% 파괴방지)
+// 강화 실패 페널티: 항상 파괴 (파괴방지로 방지 가능)
+// 파괴방지: 포인트당 0.1% 파괴방지율, 최대 95%
 function 강화실패결과(lv: number, 파괴방지: number = 0): { 감소: number; 파괴: boolean } {
-  const r = Math.random()
-  const 방지율 = Math.min(0.95, 파괴방지 * 0.001)  // 포인트당 0.1%
-  if (lv <= 5) return { 감소: 0, 파괴: false }                                // 안전
-  if (lv <= 15) {                                                              // 30% -1
-    if (r < 0.3) return { 감소: 1, 파괴: false }
-    return { 감소: 0, 파괴: false }
-  }
-  if (lv <= 30) {                                                              // 50% -1, 20% -2
-    if (r < 0.2) return { 감소: 2, 파괴: false }
-    if (r < 0.7) return { 감소: 1, 파괴: false }
-    return { 감소: 0, 파괴: false }
-  }
-  if (lv <= 45) {                                                              // 35% -2, 60% -1, 5%→(5%-방지율) 파괴
-    const 파괴p = Math.max(0, 0.05 - 방지율)
-    if (r < 파괴p) return { 감소: 0, 파괴: true }
-    if (r < 0.4) return { 감소: 2, 파괴: false }
-    return { 감소: 1, 파괴: false }
-  }
-  // 46+ 60% -3, 20% -2, 20%→(20%-방지율) 파괴
-  const 파괴p2 = Math.max(0, 0.2 - 방지율)
-  if (r < 파괴p2) return { 감소: 0, 파괴: true }
-  if (r < 0.4) return { 감소: 2, 파괴: false }
-  return { 감소: 3, 파괴: false }
+  if (lv <= 5) return { 감소: 0, 파괴: false }  // 5강 이하 안전
+  const 방지율 = Math.min(0.95, 파괴방지 * 0.001)
+  if (Math.random() < 방지율) return { 감소: 0, 파괴: false }  // 파괴방지 성공
+  return { 감소: 0, 파괴: true }  // 파괴
 }
 
 // 마린 무기 공식: base=6, upg_bonus=18 (원본 맵 UNIx 데이터)
