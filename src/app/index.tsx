@@ -297,6 +297,32 @@ type 크리스탈타입 = '증식' | '길운' | '집중' | '백색' | '절제' |
 type 크리스탈 = { id: number; 종류: 크리스탈타입; 등급: number }  // 등급 1=노말/2=레어/3=유니크
 const 크리스탈종류목록: 크리스탈타입[] = ['증식', '길운', '집중', '백색', '절제', '경험']
 
+// 명칭 크리스탈 (누적 수집형, 패시브 보너스)
+type 명칭크리스탈목록 = {
+  // 노말 (cost 50 크리스탈조각)
+  방어: number; 행운: number; 경험: number; 무력: number
+  절약: number; 총명: number; 보호: number; 각성: number
+  // 레어 (cost 100)
+  홍색: number; 주황: number; 노랑: number; 초록: number
+  파랑: number; 남색: number; 보라: number; 하늘색: number; 무색명칭: number
+  // 유니크 (cost 500)
+  흑색: number; 백색명칭: number
+  // 갤럭시 (cost 2000)
+  우주: number
+  // 퀘이사 (cost 200)
+  길운Q: number; 무구Q: number; 집중Q: number; 절제Q: number
+  탐욕Q: number; 증식Q: number; 미래Q: number; 돌파Q: number
+  // 오리진 (cost 1000)
+  창조O: number; 파멸O: number
+}
+const 초기명칭크리스탈: 명칭크리스탈목록 = {
+  방어: 0, 행운: 0, 경험: 0, 무력: 0, 절약: 0, 총명: 0, 보호: 0, 각성: 0,
+  홍색: 0, 주황: 0, 노랑: 0, 초록: 0, 파랑: 0, 남색: 0, 보라: 0, 하늘색: 0, 무색명칭: 0,
+  흑색: 0, 백색명칭: 0, 우주: 0,
+  길운Q: 0, 무구Q: 0, 집중Q: 0, 절제Q: 0, 탐욕Q: 0, 증식Q: 0, 미래Q: 0, 돌파Q: 0,
+  창조O: 0, 파멸O: 0,
+}
+
 // ============================================
 // 유틸
 // ============================================
@@ -456,6 +482,16 @@ function 크리스탈합산(장착ids: number[], 인벤: 크리스탈[], 종류:
   return total
 }
 
+// 명칭 크리스탈 패시브 보너스 합산
+function 명칭크리스탈보너스(m: 명칭크리스탈목록) {
+  const 개별확률 = (m.행운 + m.홍색 + m.보라) * 0.01 + m.백색명칭 * 0.02 + m.우주 * 0.05
+  const 파괴방지 = (m.보호 + m.노랑 + m.남색) * 2 + (m.흑색 + m.백색명칭) * 3 + m.우주 * 5
+  const 초월확률 = m.무색명칭 * 2 + m.흑색 * 5 + m.우주 * 10
+  const 무색배수 = (m.총명 + m.주황 + m.하늘색) * 0.5 + m.흑색 * 1.0 + m.우주 * 2.0
+  const 판매배수 = (m.절약 + m.주황 + m.보라) * 0.05 + m.흑색 * 0.10 + m.우주 * 1.00
+  return { 개별확률, 파괴방지, 초월확률, 무색배수, 판매배수 }
+}
+
 function 초기적들(보스번호: number = 1): 적[] {
   const hp = 보스HP(보스번호)
   return [{ id: 0, pos: { x: 필드_W / 2, y: 필드_H * 0.45 }, hp, maxHp: hp, flashUntil: 0 }]
@@ -506,6 +542,9 @@ export default function App() {
   })
   const [초월스텟, set초월스텟] = useState({ 추가초월확률: 0 })
   const [스텟탭, set스텟탭] = useState<'일반' | '초월'>('일반')
+  const [명칭크리스탈, set명칭크리스탈] = useState<명칭크리스탈목록>(() => ({ ...초기명칭크리스탈 }))
+  const [명칭크리스탈패널열림, set명칭크리스탈패널열림] = useState(false)
+  const [명칭크리스탈탭, set명칭크리스탈탭] = useState<'노말' | '레어' | '유니크' | '갤럭시' | '퀘이사' | '오리진'>('노말')
   // 영구강화 (무색조각/응무조 사용)
   const [업그레이드, set업그레이드] = useState({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
   // 패널
@@ -552,6 +591,7 @@ export default function App() {
   const 잔여포인트Ref = useRef(잔여포인트); 잔여포인트Ref.current = 잔여포인트
   const 일반스텟Ref = useRef(일반스텟); 일반스텟Ref.current = 일반스텟
   const 초월스텟Ref = useRef(초월스텟); 초월스텟Ref.current = 초월스텟
+  const 명칭크리스탈Ref = useRef(명칭크리스탈); 명칭크리스탈Ref.current = 명칭크리스탈
   const 업그레이드Ref = useRef(업그레이드); 업그레이드Ref.current = 업그레이드
   const 자동강화ONRef = useRef(자동강화ON); 자동강화ONRef.current = 자동강화ON
   const 자동강화최대lvRef = useRef(자동강화최대lv); 자동강화최대lvRef.current = 자동강화최대lv
@@ -648,6 +688,7 @@ export default function App() {
           if (typeof d.잔여포인트 === 'number') set잔여포인트(d.잔여포인트)
           if (d.일반스텟 && typeof d.일반스텟 === 'object') set일반스텟(prev => ({ ...prev, ...d.일반스텟 }))
           if (d.초월스텟 && typeof d.초월스텟 === 'object') set초월스텟(prev => ({ ...prev, ...d.초월스텟 }))
+          if (d.명칭크리스탈 && typeof d.명칭크리스탈 === 'object') set명칭크리스탈(prev => ({ ...prev, ...d.명칭크리스탈 }))
           // 오프라인 보상
           if (typeof d.마지막저장시간 === 'number' && d.마지막저장시간 > 0) {
             const 경과초 = Math.min(8 * 3600, (Date.now() - d.마지막저장시간) / 1000)
@@ -679,7 +720,7 @@ export default function App() {
       보주목록, 장착보주, 크리스탈목록, 장착크리스탈,
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
-      일반스텟, 초월스텟,
+      일반스텟, 초월스텟, 명칭크리스탈,
       누적강화성공, 누적판매, 최고마린lv,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동응축ON,
       마지막저장시간: Date.now(),
@@ -689,7 +730,7 @@ export default function App() {
       보주목록, 장착보주, 크리스탈목록, 장착크리스탈,
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
-      일반스텟, 초월스텟,
+      일반스텟, 초월스텟, 명칭크리스탈,
       누적강화성공, 누적판매, 최고마린lv,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동응축ON, 로드완료])
 
@@ -734,6 +775,7 @@ export default function App() {
       const 보주배수 = 보주합산(eqBj, invBj, '배수')
       const 크리집중 = 크리스탈합산(eqCr, invCr, '집중')
       const 크리길운 = 크리스탈합산(eqCr, invCr, '길운')
+      const 명칭보너스 = 명칭크리스탈보너스(명칭크리스탈Ref.current)
       const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03 + 스텟.유닛공업 * 0.05) * (1 + 크리집중)
       const 공속배수 = 1 + 보주공속 + upg.공속 * 0.02
       const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03) * (1 + 보주배수)
@@ -850,7 +892,7 @@ export default function App() {
               state: 'idle' as 유닛상태,
               dest: null,
             }
-            const 외부강화보너스 = 보주강화 + 크리길운 + upg.강화확률 * 0.005
+            const 외부강화보너스 = 보주강화 + 크리길운 + upg.강화확률 * 0.005 + 명칭보너스.개별확률
             const 증가 = 강화시도(m.lv, 스텟, 외부강화보너스)
             if (증가 > 0) {
               // 성공 (+1강 / +2강 / +3강)
@@ -859,7 +901,7 @@ export default function App() {
               set최고마린lv(p => Math.max(p, 새m.lv))
             } else {
               // 실패 페널티
-              const r = 강화실패결과(m.lv, 스텟.특수파괴방지 + 스텟.특수파괴방지2)
+              const r = 강화실패결과(m.lv, 스텟.특수파괴방지 + 스텟.특수파괴방지2 + 명칭보너스.파괴방지)
               if (r.파괴) {
                 if (메시지타이머Ref.current === 0 || now - 메시지타이머Ref.current > 1000) {
                   메시지표시(`💥 ${m.lv}강 마린 파괴!`)
@@ -1026,8 +1068,8 @@ export default function App() {
       // 판매소 zone에 도달한 마린 판매 처리
       let 판매무색 = 0, 판매응무조 = 0, 판매크리조각 = 0
       const 판매보주드랍: 보주[] = []
-      const 판매보상배수 = 1 + 보주합산(eqBj, invBj, '판매') + 크리스탈합산(eqCr, invCr, '경험')
-      const 무색배수 = 1 + 보주합산(eqBj, invBj, '무색')
+      const 판매보상배수 = 1 + 보주합산(eqBj, invBj, '판매') + 크리스탈합산(eqCr, invCr, '경험') + 명칭보너스.판매배수
+      const 무색배수 = 1 + 보주합산(eqBj, invBj, '무색') + 명칭보너스.무색배수
       const 조각배수 = 1 + 보주합산(eqBj, invBj, '조각')
       for (const s of 판매수집) {
         const r = 판매보상(s.lv)
@@ -1219,6 +1261,13 @@ export default function App() {
     if (캐릭레벨Ref.current < 300000) { 메시지표시('⛔ 초월 스텟은 Lv.300,000 이상 필요'); return }
     set잔여포인트(p => p - amount)
     set초월스텟(prev => ({ ...prev, [stat]: prev[stat] + amount }))
+  }
+
+  // 명칭 크리스탈 구입
+  function 명칭크리스탈구입(키: keyof 명칭크리스탈목록, 비용: number) {
+    if (크리스탈조각 < 비용) { 메시지표시('🔮 크리스탈조각 부족!'); return }
+    set크리스탈조각(prev => prev - 비용)
+    set명칭크리스탈(prev => ({ ...prev, [키]: (prev[키] as number) + 1 }))
   }
 
   // 단순 화면 전환 (탭)
@@ -1417,8 +1466,9 @@ export default function App() {
     set캐릭레벨(1); set경험치(0); set잔여포인트(0)
     set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
     set초월스텟({ 추가초월확률: 0 })
+    set명칭크리스탈({ ...초기명칭크리스탈 })
     set누적강화성공(0); set누적판매(0); set최고마린lv(1)
-    set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false)
+    set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false)
     set몹들(초기몹들())
     set자동강화ON(false); set자동강화최대lv(1)
     set자동판매ON(false); set자동판매lv(50)
@@ -1491,33 +1541,39 @@ export default function App() {
       <View style={styles.smallBtnBar}>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !생산패널열림
-          set생산패널열림(v); if (v) { set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false) }
+          set생산패널열림(v); if (v) { set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🏭 생산</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !자동패널열림
-          set자동패널열림(v); if (v) { set생산패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false) }
+          set자동패널열림(v); if (v) { set생산패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🤖 자동</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !강화패널열림
-          set강화패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false) }
+          set강화패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set명칭크리스탈패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>✨ 강화</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !보주패널열림
-          set보주패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set크리스탈패널열림(false); set강화패널열림(false) }
+          set보주패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set크리스탈패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>⚔️ 보주 ({장착보주.length}/3)</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={() => {
           const v = !크리스탈패널열림
-          set크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false) }
+          set크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>💎 크리 ({장착크리스탈.length}/3)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.smallBtn} onPress={() => {
+          const v = !명칭크리스탈패널열림
+          set명칭크리스탈패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set크리스탈패널열림(false); set강화패널열림(false) }
+        }}>
+          <Text style={styles.smallBtnText}>🌟 명칭</Text>
         </TouchableOpacity>
       </View>
 
@@ -2038,6 +2094,98 @@ export default function App() {
           </ScrollView>
         </View>
       )}
+
+      {/* 명칭 크리스탈 패널 */}
+      {명칭크리스탈패널열림 && (() => {
+        type 크탭 = '노말' | '레어' | '유니크' | '갤럭시' | '퀘이사' | '오리진'
+        type 크정보 = { 키: keyof 명칭크리스탈목록; 이름: string; 비용: number; 색상: string; 효과: string; 구현: boolean }
+        const 크리스탈목록표: Record<크탭, 크정보[]> = {
+          노말: [
+            { 키: '방어',  이름: '방어의 크리스탈',  비용: 50,  색상: '#4a90e2', 효과: '개별확률 하락 방어 240h (준비중)',      구현: false },
+            { 키: '행운',  이름: '행운의 크리스탈',  비용: 50,  색상: '#7ed957', 효과: `개별확률 +${(명칭크리스탈.행운 * 1).toFixed(0)}% (회당+1%)`,    구현: true },
+            { 키: '경험',  이름: '경험의 크리스탈',  비용: 50,  색상: '#9b59b6', 효과: '초월경험치 +50% (준비중)',             구현: false },
+            { 키: '무력',  이름: '무력의 크리스탈',  비용: 50,  색상: '#e94560', 효과: '51~56강 업그레이드 +2 (준비중)',       구현: false },
+            { 키: '절약',  이름: '절약의 크리스탈',  비용: 50,  색상: '#f5a623', 효과: `판매보상 +${(명칭크리스탈.절약 * 5).toFixed(0)}% (회당+5%)`,    구현: true },
+            { 키: '총명',  이름: '총명의 크리스탈',  비용: 50,  색상: '#1abc9c', 효과: `무색조각 +${(명칭크리스탈.총명 * 50).toFixed(0)}% (회당+50%)`,  구현: true },
+            { 키: '보호',  이름: '보호의 크리스탈',  비용: 50,  색상: '#3498db', 효과: `파괴방지 +${(명칭크리스탈.보호 * 0.2).toFixed(1)}% (회당+0.2%)`, 구현: true },
+            { 키: '각성',  이름: '각성의 크리스탈',  비용: 50,  색상: '#e67e22', 효과: '각성의 보석 +100% (준비중)',           구현: false },
+          ],
+          레어: [
+            { 키: '홍색',   이름: '홍색의 크리스탈',  비용: 100, 색상: '#e74c3c', 효과: `개별확률 +${(명칭크리스탈.홍색 * 1).toFixed(0)}% + 하락방어 240h`, 구현: true },
+            { 키: '주황',   이름: '주황의 크리스탈',  비용: 100, 색상: '#e67e22', 효과: `판매 +${(명칭크리스탈.주황 * 5).toFixed(0)}% + 무색 +${(명칭크리스탈.주황 * 50).toFixed(0)}%`, 구현: true },
+            { 키: '노랑',   이름: '노랑의 크리스탈',  비용: 100, 색상: '#f1c40f', 효과: `파괴방지 +${(명칭크리스탈.노랑 * 0.2).toFixed(1)}% + 각성보석 (준비중)`, 구현: true },
+            { 키: '초록',   이름: '초록의 크리스탈',  비용: 100, 색상: '#2ecc71', 효과: '51~56강 업그레이드 +2 + 초월경험치 (준비중)',     구현: false },
+            { 키: '파랑',   이름: '파랑의 크리스탈',  비용: 100, 색상: '#3498db', 효과: '51~56강 업그레이드 +2 + 하락방어 240h (준비중)',  구현: false },
+            { 키: '남색',   이름: '남색의 크리스탈',  비용: 100, 색상: '#2980b9', 효과: `파괴방지 +${(명칭크리스탈.남색 * 0.2).toFixed(1)}% + 초월경험치 (준비중)`, 구현: true },
+            { 키: '보라',   이름: '보라의 크리스탈',  비용: 100, 색상: '#9b59b6', 효과: `개별확률 +${(명칭크리스탈.보라 * 1).toFixed(0)}% + 판매 +${(명칭크리스탈.보라 * 5).toFixed(0)}%`, 구현: true },
+            { 키: '하늘색', 이름: '하늘색 크리스탈',  비용: 100, 색상: '#5dade2', 효과: `무색 +${(명칭크리스탈.하늘색 * 50).toFixed(0)}% + 각성보석 (준비중)`, 구현: true },
+            { 키: '무색명칭', 이름: '무색의 크리스탈', 비용: 100, 색상: '#bdc3c7', 효과: `초월확률 +${(명칭크리스탈.무색명칭 * 0.2).toFixed(1)}% (회당+0.2%)`, 구현: true },
+          ],
+          유니크: [
+            { 키: '흑색', 이름: '흑색의 크리스탈', 비용: 500, 색상: '#7f8c8d', 효과: `하락방어 60h + 무색 +${(명칭크리스탈.흑색 * 100).toFixed(0)}% + 판매 +${(명칭크리스탈.흑색 * 10).toFixed(0)}% + 초월확률 +${(명칭크리스탈.흑색 * 0.5).toFixed(1)}%`, 구현: true },
+            { 키: '백색명칭', 이름: '백색의 크리스탈', 비용: 500, 색상: '#ecf0f1', 효과: `개별확률 +${(명칭크리스탈.백색명칭 * 2).toFixed(0)}% + 파괴방지 +${(명칭크리스탈.백색명칭 * 0.3).toFixed(1)}% + 초월경험치 (준비중)`, 구현: true },
+          ],
+          갤럭시: [
+            { 키: '우주', 이름: '우주의 크리스탈', 비용: 2000, 색상: '#a855f7', 효과: `개별확률 +${(명칭크리스탈.우주 * 5).toFixed(0)}% + 파괴방지 +${(명칭크리스탈.우주 * 0.5).toFixed(1)}% + 초월확률 +${(명칭크리스탈.우주 * 1).toFixed(0)}% + 무색 +${(명칭크리스탈.우주 * 200).toFixed(0)}% + 판매 +${(명칭크리스탈.우주 * 100).toFixed(0)}%`, 구현: true },
+          ],
+          퀘이사: [
+            { 키: '길운Q',  이름: '길운의 크리스탈',  비용: 200, 색상: '#f5a623', 효과: '51~53강 강화확률 +2%p (준비중)', 구현: false },
+            { 키: '무구Q',  이름: '무구의 크리스탈',  비용: 200, 색상: '#e94560', 효과: '57~59강 업그레이드 +8 (준비중)', 구현: false },
+            { 키: '집중Q',  이름: '집중의 크리스탈',  비용: 200, 색상: '#4a90e2', 효과: '56강 융합확률 +1%p (준비중)',    구현: false },
+            { 키: '절제Q',  이름: '절제의 크리스탈',  비용: 200, 색상: '#7ed957', 효과: '융합 필요수 -10% (준비중)',      구현: false },
+            { 키: '탐욕Q',  이름: '탐욕의 크리스탈',  비용: 200, 색상: '#f1c40f', 효과: '광산 크레딧 +20% (준비중)',      구현: false },
+            { 키: '증식Q',  이름: '증식의 크리스탈',  비용: 200, 색상: '#1abc9c', 효과: '유닛 생산수 +10% (준비중)',       구현: false },
+            { 키: '미래Q',  이름: '미래의 크리스탈',  비용: 200, 색상: '#9b59b6', 효과: 'ExPoint +20% (준비중)',           구현: false },
+            { 키: '돌파Q',  이름: '돌파의 크리스탈',  비용: 200, 색상: '#e74c3c', 효과: '엑스트라 보스 데미지 +10% (준비중)', 구현: false },
+          ],
+          오리진: [
+            { 키: '창조O', 이름: '창조의 크리스탈', 비용: 1000, 색상: '#ffd700', 효과: '광산 크레딧/ExPoint/데미지/초월경험치 (준비중)', 구현: false },
+            { 키: '파멸O', 이름: '파멸의 크리스탈', 비용: 1000, 색상: '#ff4444', 효과: '57~58강 확률/크리티컬/돈/생산량 (준비중)',       구현: false },
+          ],
+        }
+        const 탭목록: 크탭[] = ['노말', '레어', '유니크', '갤럭시', '퀘이사', '오리진']
+        const 현재목록 = 크리스탈목록표[명칭크리스탈탭]
+        return (
+          <View style={styles.prodPanel}>
+            <View style={styles.prodHeader}>
+              <Text style={styles.prodTitle}>🌟 명칭 크리스탈</Text>
+              <TouchableOpacity onPress={() => set명칭크리스탈패널열림(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.prodSubtitle}>🔮 크리스탈조각: {숫자포맷(크리스탈조각)}</Text>
+            {/* 탭 */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6, gap: 4 }}>
+              {탭목록.map(t => (
+                <TouchableOpacity key={t} style={[styles.statTabBtn, 명칭크리스탈탭 === t && styles.statTabBtnOn]} onPress={() => set명칭크리스탈탭(t)}>
+                  <Text style={[styles.statTabText, 명칭크리스탈탭 === t && { color: '#000' }]}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {현재목록.map(info => {
+                const 현재수 = 명칭크리스탈[info.키] as number
+                const 살수있음 = 크리스탈조각 >= info.비용
+                return (
+                  <View key={info.키} style={[styles.upgRow, { borderLeftWidth: 3, borderLeftColor: info.색상, paddingLeft: 8, opacity: info.구현 ? 1 : 0.6 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.upgLabel, { color: info.색상 }]}>{info.이름} ×{현재수}</Text>
+                      <Text style={[styles.upgEffect, { color: info.구현 ? '#ccc' : '#666' }]}>{info.효과}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.upgBtn, !살수있음 && styles.upgBtnOff]}
+                      onPress={() => 명칭크리스탈구입(info.키, info.비용)}
+                    >
+                      <Text style={styles.upgBtnText}>구입</Text>
+                      <Text style={[styles.upgEffect, { color: 살수있음 ? '#fff' : '#666', fontSize: 9 }]}>🔮{info.비용}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              })}
+            </ScrollView>
+          </View>
+        )
+      })()}
 
       {/* 자동화 패널 */}
       {자동패널열림 && (
