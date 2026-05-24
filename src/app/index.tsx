@@ -966,7 +966,7 @@ export default function App() {
           if (typeof d.자동강화ON === 'boolean') set자동강화ON(d.자동강화ON)
           if (typeof d.자동강화최대lv === 'number') set자동강화최대lv(d.자동강화최대lv)
           if (typeof d.자동판매ON === 'boolean') set자동판매ON(d.자동판매ON)
-          if (typeof d.자동판매lv === 'number') set자동판매lv(d.자동판매lv)
+          if (typeof d.자동판매lv === 'number') set자동판매lv(Math.max(15, d.자동판매lv))
           if (typeof d.자동구입강도 === 'number') set자동구입강도(d.자동구입강도)
           if (typeof d.자동구입ON === 'boolean') set자동구입ON(d.자동구입ON)
           if (typeof d.자동응축ON === 'boolean') set자동응축ON(d.자동응축ON)
@@ -2876,10 +2876,10 @@ export default function App() {
           {/* 자동 판매 */}
           <View style={styles.sliderRow}>
             <Text style={styles.sliderLabel}>🛒 판매 =</Text>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동판매lv(v => Math.max(1, v - 5))}>
+            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동판매lv(v => Math.max(15, v - 5))}>
               <Text style={styles.sliderArrowText}>≪</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동판매lv(v => Math.max(1, v - 1))}>
+            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동판매lv(v => Math.max(15, v - 1))}>
               <Text style={styles.sliderArrowText}>◀</Text>
             </TouchableOpacity>
             <Text style={styles.sliderValue}>+{자동판매lv}</Text>
