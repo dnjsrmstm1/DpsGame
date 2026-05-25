@@ -141,58 +141,103 @@ function 강화실패결과(lv: number, 파괴방지: number = 0): { 감소: num
   return { 감소: 0, 파괴: true }  // 파괴
 }
 
-// 공격력 공식 — 원본 맵 (Marine Gauss Rifle W0: base=6, upg=+1/lv)
-// 강도 = Terran Infantry Weapons upgrade level (1-60강)
-// 6 tier 마다 unit class 변경 (sprite type 1~10):
-//   1~6강 Marine: base 6, +1/lv
-//   7~12강 Firebat: base 16, +2/lv
-//   13~18강 Ghost: base 10, +3/lv (커스텀)
-//   19~24강 Vulture: base 20, +4/lv
-//   25~30강 Goliath: base 24, +6/lv
-//   31~36강 Tank Siege: base 70, +8/lv
-//   37~42강 Wraith Air: base 40, +10/lv
-//   43~48강 Battlecruiser: base 50, +15/lv
-//   49~54강 Hero Tier: base 150, +20/lv
-//   55~60강 Final Tier: base 300, +30/lv
-const _공격력테이블: { 시작: number; base: number; upg: number }[] = [
-  { 시작: 1,  base: 6,   upg: 1 },
-  { 시작: 7,  base: 16,  upg: 2 },
-  { 시작: 13, base: 10,  upg: 3 },
-  { 시작: 19, base: 20,  upg: 4 },
-  { 시작: 25, base: 24,  upg: 6 },
-  { 시작: 31, base: 70,  upg: 8 },
-  { 시작: 37, base: 40,  upg: 10 },
-  { 시작: 43, base: 50,  upg: 15 },
-  { 시작: 49, base: 150, upg: 20 },
-  { 시작: 55, base: 300, upg: 30 },
-]
-function 공격력(단계: number, 초월업51_56: number = 0, 초월공57_59: number = 0) {
-  let tier = _공격력테이블[0]
-  for (const t of _공격력테이블) if (단계 >= t.시작) tier = t
-  let dmg = tier.base + (단계 - tier.시작) * tier.upg
+// 공격력/공속 — 유저 제공 실측 테이블 (유닛 기본 수치.xlsx)
+// [강도] = { base: 기본공격력, upg: 1유닛공업당 추가, 속도: 단계명, 연타: 1회공격당타수 }
+// 60강 — 미정 (0)
+type 강도스펙 = { base: number; upg: number; 속도: '매우느림'|'느림'|'보통'|'빠름'|'극한'|'초월'; 연타: number }
+const 강도표: Record<number, 강도스펙> = {
+  1:  { base: 1,         upg: 0,       속도: '보통',    연타: 1 },
+  2:  { base: 10,        upg: 1,       속도: '매우느림', 연타: 1 },
+  3:  { base: 20,        upg: 2,       속도: '매우느림', 연타: 1 },
+  4:  { base: 20,        upg: 2,       속도: '느림',    연타: 1 },
+  5:  { base: 30,        upg: 3,       속도: '느림',    연타: 1 },
+  6:  { base: 50,        upg: 5,       속도: '느림',    연타: 1 },
+  7:  { base: 80,        upg: 8,       속도: '느림',    연타: 1 },
+  8:  { base: 120,       upg: 12,      속도: '느림',    연타: 3 },
+  9:  { base: 150,       upg: 15,      속도: '느림',    연타: 2 },
+  10: { base: 250,       upg: 25,      속도: '느림',    연타: 1 },
+  11: { base: 500,       upg: 50,      속도: '매우느림', 연타: 2 },
+  12: { base: 400,       upg: 40,      속도: '느림',    연타: 1 },
+  13: { base: 550,       upg: 55,      속도: '느림',    연타: 1 },
+  14: { base: 1000,      upg: 100,     속도: '매우느림', 연타: 1 },
+  15: { base: 1300,      upg: 130,     속도: '매우느림', 연타: 1 },
+  16: { base: 1000,      upg: 100,     속도: '느림',    연타: 1 },
+  17: { base: 1300,      upg: 130,     속도: '느림',    연타: 1 },
+  18: { base: 1800,      upg: 180,     속도: '느림',    연타: 1 },
+  19: { base: 600,       upg: 60,      속도: '빠름',    연타: 1 },
+  20: { base: 2000,      upg: 200,     속도: '보통',    연타: 1 },
+  21: { base: 2700,      upg: 270,     속도: '보통',    연타: 1 },
+  22: { base: 3500,      upg: 350,     속도: '보통',    연타: 1 },
+  23: { base: 5000,      upg: 500,     속도: '보통',    연타: 1 },
+  24: { base: 6500,      upg: 650,     속도: '보통',    연타: 1 },
+  25: { base: 5000,      upg: 500,     속도: '빠름',    연타: 1 },
+  26: { base: 10,        upg: 1,       속도: '보통',    연타: 1 },
+  27: { base: 30,        upg: 3,       속도: '느림',    연타: 1 },
+  28: { base: 20,        upg: 2,       속도: '보통',    연타: 1 },
+  29: { base: 30,        upg: 3,       속도: '보통',    연타: 1 },
+  30: { base: 100,       upg: 10,      속도: '느림',    연타: 1 },
+  31: { base: 80,        upg: 8,       속도: '보통',    연타: 1 },
+  32: { base: 150,       upg: 15,      속도: '보통',    연타: 1 },
+  33: { base: 700,       upg: 70,      속도: '매우느림', 연타: 1 },
+  34: { base: 350,       upg: 35,      속도: '보통',    연타: 1 },
+  35: { base: 1200,      upg: 120,     속도: '느림',    연타: 1 },
+  36: { base: 1500,      upg: 150,     속도: '느림',    연타: 3 },
+  37: { base: 2000,      upg: 200,     속도: '보통',    연타: 1 },
+  38: { base: 4000,      upg: 400,     속도: '보통',    연타: 1 },
+  39: { base: 3500,      upg: 350,     속도: '빠름',    연타: 1 },
+  40: { base: 4000,      upg: 400,     속도: '극한',    연타: 1 },  // 매우빠름→극한 매핑
+  41: { base: 40,        upg: 4,       속도: '매우느림', 연타: 1 },
+  42: { base: 70,        upg: 7,       속도: '느림',    연타: 1 },
+  43: { base: 120,       upg: 12,      속도: '보통',    연타: 1 },
+  44: { base: 400,       upg: 40,      속도: '빠름',    연타: 1 },
+  45: { base: 2500,      upg: 250,     속도: '느림',    연타: 1 },
+  46: { base: 2800,      upg: 280,     속도: '보통',    연타: 1 },
+  47: { base: 3400,      upg: 340,     속도: '빠름',    연타: 1 },
+  48: { base: 6550,      upg: 655,     속도: '극한',    연타: 1 },
+  49: { base: 6550,      upg: 655,     속도: '초월',    연타: 1 },
+  50: { base: 65500,     upg: 728,     속도: '초월',    연타: 1 },
+  51: { base: 30,        upg: 3,       속도: '보통',    연타: 1 },
+  52: { base: 200,       upg: 20,      속도: '느림',    연타: 1 },
+  53: { base: 350,       upg: 35,      속도: '보통',    연타: 1 },
+  54: { base: 700,       upg: 70,      속도: '빠름',    연타: 1 },
+  55: { base: 14400,     upg: 1440,    속도: '느림',    연타: 1 },
+  56: { base: 30000,     upg: 3000,    속도: '보통',    연타: 1 },
+  57: { base: 1500000,   upg: 150000,  속도: '보통',    연타: 1 },
+  58: { base: 15000000,  upg: 1500000, 속도: '보통',    연타: 1 },
+  59: { base: 37373737,  upg: 3737373, 속도: '빠름',    연타: 1 },
+  60: { base: 0,         upg: 0,       속도: '보통',    연타: 1 },  // 미정
+}
+
+// 공속 단계 → atk/s (cooldown 역수)
+const _공속맵: Record<string, number> = {
+  '매우느림': 1 / 2.5,   // 0.40
+  '느림':     1 / 1.8,   // 0.56
+  '보통':     1 / 1.2,   // 0.83
+  '빠름':     1 / 0.8,   // 1.25
+  '극한':     1 / 0.5,   // 2.00
+  '초월':     1 / 0.3,   // 3.33
+}
+
+function 공격력(단계: number, 초월업51_56: number = 0, 초월공57_59: number = 0, 유닛공업: number = 0) {
+  const t = 강도표[단계] ?? 강도표[1]
+  let dmg = t.base + t.upg * 유닛공업
   if (단계 >= 51 && 단계 <= 56) dmg += 초월업51_56 * 9
   if (단계 >= 57 && 단계 <= 59) dmg += 초월공57_59 * 8
   return dmg
 }
 
-// 공격속도 — 6 단계 (원본 맵 BW unit class cooldown 기반)
-// 1~10강: 1.0 atk/s (Marine 15f)
-// 11~20강: 1.5 (Firebat 22f → boosted)
-// 21~30강: 2.0 (Ghost 22f → boosted)
-// 31~40강: 2.5 (Vulture/Goliath)
-// 41~50강: 3.0 (Tank ranged 30f)
-// 51~60강: 4.0 (Heavy hero)
 function 공격속도(단계: number) {
-  if (단계 <= 10) return 1.0
-  if (단계 <= 20) return 1.5
-  if (단계 <= 30) return 2.0
-  if (단계 <= 40) return 2.5
-  if (단계 <= 50) return 3.0
-  return 4.0
+  const t = 강도표[단계] ?? 강도표[1]
+  return _공속맵[t.속도] ?? 1.0
 }
 
+function 연타수(단계: number) {
+  return (강도표[단계] ?? 강도표[1]).연타
+}
+
+// DPS = 공격력 × 공속 × 연타
 function 유닛DPS(단계: number) {
-  return 공격력(단계) * 공격속도(단계)
+  return 공격력(단계) * 공격속도(단계) * 연타수(단계)
 }
 
 // DPS 단계별 자원 배수
@@ -798,6 +843,15 @@ export default function App() {
   // 초월레벨
   const [초월레벨, set초월레벨] = useState(0)
   const [초월잔여포인트, set초월잔여포인트] = useState(0)
+  // 환생 시스템 (영구 — 환생시 유지)
+  // 트리거: 60강 마린 보유 + 초월레벨 ≥ 10
+  // 보상: 환생크레딧 (일반 크레딧과 합산) + 환생레벨 +1
+  // 환생크레딧 = floor((초월레벨 × 1000) + (총공격수 / 1e8))
+  const [환생레벨, set환생레벨] = useState(0)
+  const [누적환생수, set누적환생수] = useState(0)
+  // 패시브: id → 구입 레벨
+  const [환생패시브, set환생패시브] = useState<Record<string, number>>({})
+  const [환생패널열림, set환생패널열림] = useState(false)
   // 신규 재화 (원본 맵 기반)
   // 각성의 보석: 보스/뽑기에서 드랍, 추가 Ex스탯 포인트 교환에 사용
   const [각성의보석, set각성의보석] = useState(0)
@@ -915,9 +969,9 @@ export default function App() {
   const 사냥터캡 = 8 + 보스처치수 * 4
   const 보스존캡 = 8
   const _초월r = 초월스텟
-  const 사냥터DPS = 보스존마린들.filter(m => m.state === 'attacking').reduce((s, m) => s + 공격력(m.lv, _초월r.업그51_56, _초월r.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * (1 + _크리r), 0)
+  const 사냥터DPS = 보스존마린들.filter(m => m.state === 'attacking').reduce((s, m) => s + 공격력(m.lv, _초월r.업그51_56, _초월r.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
   const 현재배수 = 자원배수(Math.max(사냥터DPS, 최고DPS)) * (1 + _보주배수r)
-  const 사냥터마린DPS = 사냥터마린들.reduce((s, m) => s + 공격력(m.lv, _초월r.업그51_56, _초월r.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * (1 + _크리r), 0)
+  const 사냥터마린DPS = 사냥터마린들.reduce((s, m) => s + 공격력(m.lv, _초월r.업그51_56, _초월r.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
   const 시간당미네랄 = 사냥터마린DPS * 현재배수 * (1 + _보주자원r) * 3600
   const 선택한마린들 = 마린들.filter(m => 선택ID.includes(m.id)).sort((a, b) => b.lv - a.lv)
 
@@ -990,6 +1044,9 @@ export default function App() {
           if (typeof d.타격수획득idx === 'number') set타격수획득idx(d.타격수획득idx)
           if (typeof d.extraVI받음 === 'number') setExtraVI받음(d.extraVI받음)
           if (typeof d.extraXI받음 === 'number') setExtraXI받음(d.extraXI받음)
+          if (typeof d.환생레벨 === 'number') set환생레벨(d.환생레벨)
+          if (typeof d.누적환생수 === 'number') set누적환생수(d.누적환생수)
+          if (d.환생패시브 && typeof d.환생패시브 === 'object') set환생패시브(d.환생패시브)
           // 오프라인 보상
           if (typeof d.마지막저장시간 === 'number' && d.마지막저장시간 > 0) {
             const 경과초 = Math.min(8 * 3600, (Date.now() - d.마지막저장시간) / 1000)
@@ -1025,6 +1082,7 @@ export default function App() {
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
       각성의보석, ExPoint, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
+      환생레벨, 누적환생수, 환생패시브,
       누적강화성공, 누적판매, 최고마린lv,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동응축ON,
       마지막저장시간: Date.now(),
@@ -1038,6 +1096,7 @@ export default function App() {
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
       각성의보석, ExPoint, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
+      환생레벨, 누적환생수, 환생패시브,
       누적강화성공, 누적판매, 최고마린lv,
       자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동응축ON, 로드완료])
 
@@ -1090,7 +1149,7 @@ export default function App() {
       const 사냥터캡 = 8 + 보스처치수Ref.current * 4
       const 평균크리 = Math.min(0.95, 보주크리)
       const 초월s = 초월스텟Ref.current
-      const 효과DPS = (lv: number) => 공격력(lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 공격속도(lv) * 공속배수 * (1 + 평균크리)
+      const 효과DPS = (lv: number) => 공격력(lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 공격속도(lv) * 공속배수 * 연타수(lv) * (1 + 평균크리)
       const huntingDPS = bossMarines.filter(m => m.state === 'attacking').reduce((s, m) => s + 효과DPS(m.lv), 0)
       if (huntingDPS > 최고DPSRef.current) {
         set최고DPS(huntingDPS)
@@ -1211,10 +1270,11 @@ export default function App() {
             const 초월51_53보너스 = (m.lv >= 51 && m.lv <= 53) ? 초월s.강화51_53 * 0.02 : 0
             // 초월 56강 융합확률 보너스 (56강 적용)
             const 초월56융합 = (m.lv === 56) ? 초월s.융합56 * 0.01 : 0
-            const 외부강화보너스 = 보주강화 + upg.강화확률 * 0.005 + 명칭보너스.개별확률 + 고유유닛스텟cur.추가1강 * 0.0025 + 고유유닛스텟cur.특수강화 * 0.005 + 초월51_53보너스 + 초월56융합
+            const _환생강화보너스 = Math.min(0.05, (환생패시브['강화확률'] ?? 0) * 0.005)
+            const 외부강화보너스 = 보주강화 + upg.강화확률 * 0.005 + 명칭보너스.개별확률 + 고유유닛스텟cur.추가1강 * 0.0025 + 고유유닛스텟cur.특수강화 * 0.005 + 초월51_53보너스 + 초월56융합 + _환생강화보너스
             // 50강 → 51강 초월 시도
             if (m.lv === 50) {
-              const 초월p = (초월스텟Ref.current.추가초월확률 + 명칭보너스.초월확률 + 초월lv) * 0.00001 + 보석b.초월확률추가
+              const 초월p = (초월스텟Ref.current.추가초월확률 + 명칭보너스.초월확률 + 초월lv + (환생패시브['초월보너스'] ?? 0)) * 0.00001 + 보석b.초월확률추가
               const 초월성공 = Math.random() < Math.min(0.95, 초월p)
               if (초월성공) {
                 새m.lv = 51
@@ -1326,7 +1386,7 @@ export default function App() {
               const isCrit = Math.random() < 평균크리
               // 보스 데미지 보너스 (초월스텟 보스데미지 +10%/pt)
               const 보스데미지배수 = 1 + 초월s.보스데미지 * 0.1
-              const dmgShow = Math.round(공격력(n.lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 보스데미지배수 * (isCrit ? 2 : 1))
+              const dmgShow = Math.round(공격력(n.lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 보스데미지배수 * 연타수(n.lv) * (isCrit ? 2 : 1))
               if (Math.random() < 0.4) {
                 const fid = dmgIdRef.current++
                 setDmg플로팅들(prev => [...prev.slice(-20), {
@@ -1368,7 +1428,7 @@ export default function App() {
               n.마지막공격시간 = now
               n.공격플래시Until = now + 150
               const isCrit = Math.random() < 평균크리
-              const dmg = 공격력(n.lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * (isCrit ? 2 : 1)
+              const dmg = 공격력(n.lv, 초월s.업그51_56, 초월s.공격57_59) * 공격력배수 * 연타수(n.lv) * (isCrit ? 2 : 1)
               // 티어별 보상 배수: 1=×1 mineral, 2=×3 mineral, 3=×6 mineral+credit (DPS측정기)
               const tier = target.티어
               const tierMul = tier === 1 ? 1 : tier === 2 ? 3 : 6
@@ -1626,18 +1686,20 @@ export default function App() {
         const baseN = 보스처치수Ref.current
         set보스처치수(prev => prev + 1)
         if (Platform.OS !== 'web') Vibration.vibrate([0, 100, 50, 100])
+        // 환생 패시브: 보스 보상 배수
+        const _보스배수 = 1 + (환생패시브['보스보상'] ?? 0) * 0.5
         // 크리스탈조각 드랍 (보스번호 * 10)
-        const 조각드랍 = Math.round((baseN + 1) * 10 * (1 + 보주합산(bj, '조각')))
+        const 조각드랍 = Math.round((baseN + 1) * 10 * (1 + 보주합산(bj, '조각')) * _보스배수)
         set크리스탈조각(prev => prev + 조각드랍)
         // 보스 처치 XP: 보스번호 * 200
-        XP획득((baseN + 1) * 200)
+        XP획득(Math.round((baseN + 1) * 200 * _보스배수))
         // 크레딧 보상 (섬세보석으로 증폭)
-        set크레딧(prev => prev + Math.round((10 + baseN * 5) * 보석b.크레딧배수))
+        set크레딧(prev => prev + Math.round((10 + baseN * 5) * 보석b.크레딧배수 * _보스배수))
         // 각성의 보석 (3보스마다 1개 + 5% 확률 추가)
         const 각성드랍 = Math.floor((baseN + 1) / 3) + (Math.random() < 0.05 ? 1 : 0)
-        if (각성드랍 > 0) set각성의보석(prev => prev + 각성드랍)
+        if (각성드랍 > 0) set각성의보석(prev => prev + Math.round(각성드랍 * _보스배수))
         // ExPoint (보스번호 * 100, 초월시스템용)
-        setExPoint(prev => prev + (baseN + 1) * 100)
+        setExPoint(prev => prev + Math.round((baseN + 1) * 100 * _보스배수))
         // 🎉 Extra LV. VI (파티보스 6단계): 6보스마다 1회 보상
         // 보상: 응무조 +20, 일반 XP 폭증, ExPoint 500
         if ((baseN + 1) % 6 === 0) {
@@ -1751,6 +1813,100 @@ export default function App() {
     set초월스텟(prev => ({ ...prev, [stat]: prev[stat] + amount }))
   }
 
+  // ============================================
+  // 🌟 환생 시스템
+  // ============================================
+  // 트리거 조건: 60강 마린 보유 + 초월레벨 ≥ 10
+  // 환생크레딧 = floor((초월레벨 × 1000) + (총공격수 / 1e8))
+  // 환생레벨 +1, 환생패시브/환생레벨/누적환생수/크레딧 외 모두 리셋
+  function 환생가능여부(): { ok: boolean; 이유: string } {
+    const has60 = 마린들Ref.current.some(m => m.lv >= 60)
+    if (!has60) return { ok: false, 이유: '60강 마린 필요' }
+    if (초월레벨Ref.current < 10) return { ok: false, 이유: '초월레벨 10 필요' }
+    return { ok: true, 이유: '' }
+  }
+  function 환생보상크레딧(): number {
+    return Math.floor(초월레벨Ref.current * 1000 + 총공격수Ref.current / 1e8)
+  }
+  function 환생실행() {
+    const chk = 환생가능여부()
+    if (!chk.ok) { 메시지표시(`⛔ 환생 불가: ${chk.이유}`); return }
+    const 보상 = 환생보상크레딧()
+    if (typeof window !== 'undefined' && window.confirm) {
+      if (!window.confirm(`정말 환생할까요?\n\n보상: 💰 ${숫자포맷(보상)} 크레딧 + 환생레벨 +1\n\n[유지] 환생레벨, 환생패시브, 크레딧\n[리셋] 마린/재화/스텟/보주/크리스탈/보석/고유유닛/초월`)) return
+    }
+    // 영구 유지 항목 기억
+    const 유지_크레딧 = 크레딧 + 보상
+    // 리셋 (게임초기화와 동일하지만 환생 항목 + 크레딧 보존)
+    set마린들(초기마린들())
+    setMineral(100 + (환생패시브['시작미네랄'] ?? 0) * 1000)
+    set총공격수(0)
+    set보스처치수(0)
+    set최고DPS(0)
+    set무색조각(0); set응무조(0); set크리스탈조각(0)
+    set보주({ ...초기보주 })
+    set업그레이드({ 공격력: 0, 자원: 0, 강화확률: 0, 이속: 0, 공속: 0 })
+    set캐릭레벨(1); set경험치(0); set잔여포인트(0)
+    set일반스텟({ 돈수급량: 0, 유닛공업: 0, 가산1강: 0, 가산2강: 0, 가산3강: 0, 특수강화: 0, 가산1강2: 0, 가산2강2: 0, 가산3강2: 0, 특수강화2: 0, 특수파괴방지: 0, 특수파괴방지2: 0, 가산44강: 0, 가산45강: 0, 가산46강: 0, 가산47강: 0, 가산48강: 0 })
+    set초월스텟({ 추가초월확률: 0, 강화51_53: 0, 업그51_56: 0, 공격57_59: 0, 융합56: 0, 보스데미지: 0 })
+    set각성의보석(0); setExPoint(0); set은하조각(0); set자각보주(0)
+    // 패시브: 타격수 50% 유지
+    const 타격수유지 = (환생패시브['타격수유지'] ?? 0) > 0
+    if (!타격수유지) set타격수획득idx(0)
+    setExtraVI받음(0); setExtraXI받음(0)
+    set명칭크리스탈({ ...초기명칭크리스탈 })
+    set장착크리스탈([])
+    set크레딧(유지_크레딧)
+    set보석({ ...초기보석 })
+    const _고유시작 = 환생패시브['고유유닛시작'] ?? 0
+    set고유유닛({ ...초기고유유닛, 공격력: _고유시작, 추가1강: _고유시작, 특수강화: _고유시작 })
+    set초월레벨(0)
+    set초월잔여포인트(0)
+    set누적강화성공(0); set누적판매(0); set최고마린lv(1)
+    set몹들(초기몹들())
+    // 패시브: 자동강화 시작 해금
+    const 자동해금 = (환생패시브['자동강화시작'] ?? 0) > 0
+    set자동강화ON(자동해금); set자동강화최대lv(1)
+    set자동판매ON(false); set자동판매lv(50)
+    set자동구입강도(1); set자동구입ON(false); set자동응축ON(false)
+    set적들(초기적들(1))
+    set선택ID([])
+    set현재화면('base')
+    set생산패널열림(false)
+    // 환생 영구 갱신
+    set환생레벨(v => v + 1)
+    set누적환생수(v => v + 1)
+    set환생패널열림(false)
+    메시지표시(`🌟 환생! 💰+${숫자포맷(보상)} 크레딧 (환생Lv.${환생레벨 + 1})`)
+  }
+  // 환생 패시브 정의
+  const 환생패시브목록 = [
+    { id: '시작미네랄',    이름: '🌱 시작 미네랄',     설명: '환생 시작시 💎+1000/lv',                   기본가: 5000,  maxLv: 50 },
+    { id: '강화확률',      이름: '🎯 강화 확률',       설명: '모든 강화확률 +0.5%p/lv (최대 5%)',         기본가: 20000, maxLv: 10 },
+    { id: '자동강화시작',  이름: '⚙️ 자동강화 해금',    설명: '환생후 자동강화 자동 활성화 (1회)',         기본가: 30000, maxLv: 1 },
+    { id: '초월보너스',    이름: '🌀 초월레벨 보너스',  설명: '초월확률 계산에 +1/lv 가산',               기본가: 50000, maxLv: 100 },
+    { id: '응무조효율',    이름: '💠 응무조 효율',      설명: '무색조각→응무조 환산시 ×(1+lv)',           기본가: 40000, maxLv: 9 },
+    { id: '보스보상',      이름: '👹 보스 보상',        설명: '보스 처치 보상 ×(1+0.5×lv)',               기본가: 60000, maxLv: 10 },
+    { id: '고유유닛시작',  이름: '🛡️ 고유유닛 시작',   설명: '환생시 고유유닛 시작 강화 +1/lv',          기본가: 80000, maxLv: 20 },
+    { id: '타격수유지',    이름: '⚡ 타격수 유지',      설명: '환생후 타격수 진행 50% 인계 (1회)',         기본가: 100000,maxLv: 1 },
+  ] as const
+  function 환생패시브가격(id: string): number {
+    const def = 환생패시브목록.find(p => p.id === id)
+    if (!def) return Infinity
+    const lv = 환생패시브[id] ?? 0
+    return Math.floor(def.기본가 * Math.pow(2, lv))
+  }
+  function 환생패시브구입(id: string) {
+    const def = 환생패시브목록.find(p => p.id === id)
+    if (!def) return
+    const lv = 환생패시브[id] ?? 0
+    if (lv >= def.maxLv) { 메시지표시('⛔ 최대 레벨'); return }
+    const cost = 환생패시브가격(id)
+    if (크레딧 < cost) { 메시지표시(`⛔ 크레딧 부족 (필요 ${숫자포맷(cost)})`); return }
+    set크레딧(c => c - cost)
+    set환생패시브(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }))
+  }
+
   // 보주 구입 (응무조 사용, 수량 지정)
   function 보주구입(종류: 보주타입, 수량: number) {
     const 단가 = 보주구입비용[종류]
@@ -1840,9 +1996,10 @@ export default function App() {
   function 응축하기() {
     if (무색조각 < 10000) { 메시지표시('무색조각 1만 필요'); return }
     const 변환 = Math.floor(무색조각 / 10000)
+    const 효율 = 1 + (환생패시브['응무조효율'] ?? 0)
     set무색조각(prev => prev - 변환 * 10000)
-    set응무조(prev => prev + 변환)
-    메시지표시(`💠 ${변환} 응축 (1만 무색 → 1 응무)`)
+    set응무조(prev => prev + 변환 * 효율)
+    메시지표시(`💠 ${변환 * 효율} 응축 (1만 무색 → ${효율} 응무)`)
   }
 
   function 유닛구매(강도: number) {
@@ -2040,8 +2197,9 @@ export default function App() {
     set초월레벨(0)
     set초월잔여포인트(0)
     set누적강화성공(0); set누적판매(0); set최고마린lv(1)
+    set환생레벨(0); set누적환생수(0); set환생패시브({})
     set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false)
-    set보석패널열림(false); set고유유닛패널열림(false)
+    set보석패널열림(false); set고유유닛패널열림(false); set환생패널열림(false)
     set몹들(초기몹들())
     set자동강화ON(false); set자동강화최대lv(1)
     set자동판매ON(false); set자동판매lv(50)
@@ -2086,6 +2244,7 @@ export default function App() {
           <Text style={styles.statSmall}>🔮 {숫자포맷(크리스탈조각)}</Text>
           <Text style={[styles.statSmall, { color: 잔여포인트 > 0 ? '#f5a623' : '#aaa' }]}>Lv.{캐릭레벨}{잔여포인트 > 0 ? ` (+${잔여포인트}P)` : ''}</Text>
           {초월레벨 > 0 && <Text style={[styles.statSmall, { color: '#a855f7' }]}>🌀초월Lv.{초월레벨}{초월잔여포인트 > 0 ? ` (+${초월잔여포인트}P)` : ''}</Text>}
+          {환생레벨 > 0 && <Text style={[styles.statSmall, { color: '#ff6ad9' }]}>🌟환생Lv.{환생레벨}</Text>}
           {크레딧 > 0 && <Text style={[styles.statSmall, { color: '#f5a623' }]}>💰 {숫자포맷(크레딧)}크레딧</Text>}
         </View>
         {(각성의보석 > 0 || ExPoint > 0 || 은하조각 > 0 || 자각보주 > 0) && (
@@ -2175,6 +2334,12 @@ export default function App() {
           set고유유닛패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false) }
         }}>
           <Text style={styles.smallBtnText}>🦸 고유({크레딧})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.smallBtn, { backgroundColor: '#5b2a8c' }]} onPress={() => {
+          const v = !환생패널열림
+          set환생패널열림(v); if (v) { set생산패널열림(false); set자동패널열림(false); set보주패널열림(false); set강화패널열림(false); set명칭크리스탈패널열림(false); set보석패널열림(false); set고유유닛패널열림(false) }
+        }}>
+          <Text style={styles.smallBtnText}>🌟 환생{환생레벨 > 0 ? `(Lv.${환생레벨})` : ''}</Text>
         </TouchableOpacity>
       </View>
 
@@ -2267,7 +2432,7 @@ export default function App() {
           // 티어별 DPS (마린)
           const 티어DPS = 사냥터마린들
             .filter(m => 사냥터티어(m.lv) === mb.티어)
-            .reduce((s, m) => s + 공격력(m.lv, 초월스텟.업그51_56, 초월스텟.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * (1 + _크리r), 0)
+            .reduce((s, m) => s + 공격력(m.lv, 초월스텟.업그51_56, 초월스텟.공격57_59) * _공격력배수r * 공격속도(m.lv) * _공속배수r * 연타수(m.lv) * (1 + _크리r), 0)
           return (
             <View key={mb.id} pointerEvents="none">
               <View style={[styles.enemy, {
@@ -2833,6 +2998,62 @@ export default function App() {
                   <Text style={styles.upgBtnText}>→ 사{고유유닛.위치 === 1 ? 2 : 고유유닛.위치 === 2 ? 3 : 1}</Text>
                 </TouchableOpacity>
               </View>
+            </ScrollView>
+          </View>
+        )
+      })()}
+
+      {/* 🌟 환생 패널 */}
+      {환생패널열림 && (() => {
+        const chk = 환생가능여부()
+        const 보상 = 환생보상크레딧()
+        return (
+          <View style={styles.prodPanel}>
+            <View style={styles.prodHeader}>
+              <Text style={styles.prodTitle}>🌟 환생 (Lv.{환생레벨})</Text>
+              <TouchableOpacity onPress={() => set환생패널열림(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.prodSubtitle}>누적 환생: {누적환생수}회 · 💰 {숫자포맷(크레딧)}</Text>
+            <Text style={[styles.prodSubtitle, { color: '#a855f7' }]}>
+              조건: 60강 마린 보유 + 초월레벨 ≥ 10
+            </Text>
+            <Text style={[styles.prodSubtitle, { color: chk.ok ? '#7ed957' : '#ff6b6b' }]}>
+              {chk.ok ? `✓ 환생 가능 — 보상 💰 ${숫자포맷(보상)}` : `✗ ${chk.이유}`}
+            </Text>
+            <TouchableOpacity
+              style={[styles.upgBtn, { backgroundColor: chk.ok ? '#7ed957' : '#555', marginVertical: 8 }]}
+              onPress={환생실행}
+              disabled={!chk.ok}
+            >
+              <Text style={[styles.upgBtnText, { fontSize: 14 }]}>
+                🌟 환생하기 (보상 💰 {숫자포맷(보상)})
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <Text style={[styles.prodSubtitle, { color: '#f5a623' }]}>🎁 영구 패시브 (💰 크레딧 소모)</Text>
+            <ScrollView style={{ maxHeight: 360 }}>
+              {환생패시브목록.map(p => {
+                const lv = 환생패시브[p.id] ?? 0
+                const maxed = lv >= p.maxLv
+                const cost = maxed ? 0 : 환생패시브가격(p.id)
+                const ok = !maxed && 크레딧 >= cost
+                return (
+                  <View key={p.id} style={styles.upgRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.upgLabel}>{p.이름} <Text style={{ color: '#f5a623' }}>Lv.{lv}/{p.maxLv}</Text></Text>
+                      <Text style={styles.upgEffect}>{p.설명}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 80 }]}
+                      onPress={() => 환생패시브구입(p.id)}
+                    >
+                      <Text style={styles.upgBtnText}>{maxed ? 'MAX' : `💰${숫자포맷(cost)}`}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              })}
             </ScrollView>
           </View>
         )
