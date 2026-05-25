@@ -176,23 +176,21 @@ function 강화시도(단계: number, 스텟: 강화스텟, 외부p1: number = 0
     const bonus = (스텟.특수강화 + 스텟.특수강화2) * 0.001
     return r < Math.min(0.95, bonus) ? 1 : 0
   }
-  // 36~39강: +3=0 +2=0, +1 = base*1.11 + 스텟 + 외부보너스
-  if (단계 >= 36 && 단계 <= 39) {
-    const p1 = Math.min(0.95, base * 1.11 + (스텟.가산1강 + 스텟.가산1강2 + 스텟.가산2강 + 스텟.가산2강2 + 스텟.가산3강 + 스텟.가산3강2) * 0.001 + 외부p1)
+  // 38~39강: +2/+3 폐지 (+1로 통합), 38강+ 부터 +1만
+  // 특수확률(특수강화/2) → +1/+2/+3 모두에 가산 (신규 사양)
+  const 특수가산 = (스텟.특수강화 + 스텟.특수강화2) * 0.001
+  if (단계 >= 38 && 단계 <= 39) {
+    const p1 = Math.min(0.95,
+      base * 1.11
+      + (스텟.가산1강 + 스텟.가산1강2 + 스텟.가산2강 + 스텟.가산2강2 + 스텟.가산3강 + 스텟.가산3강2) * 0.001
+      + 특수가산
+      + 외부p1)
     return r < p1 ? 1 : 0
   }
-  // 35강: +3=0, +2에 +3 확률 흡수
-  if (단계 === 35) {
-    const p2 = Math.min(0.95, base / 10 + base / 100 + (스텟.가산2강 + 스텟.가산2강2 + 스텟.가산3강 + 스텟.가산3강2) * 0.001)
-    const p1 = Math.min(0.95, base + (스텟.가산1강 + 스텟.가산1강2) * 0.001 + 외부p1)
-    if (r < p2) return 2
-    if (r < p2 + p1) return 1
-    return 0
-  }
-  // 1~34강: 표준 (+3/+2/+1/실패)
-  const p3 = Math.min(0.95, base / 100 + (스텟.가산3강 + 스텟.가산3강2) * 0.001)
-  const p2 = Math.min(0.95, base / 10  + (스텟.가산2강 + 스텟.가산2강2) * 0.001)
-  const p1 = Math.min(0.95, base       + (스텟.가산1강 + 스텟.가산1강2) * 0.001 + 외부p1)
+  // 1~37강: +1/+2/+3 분리 (일반확률 + 특수확률)
+  const p3 = Math.min(0.95, base / 100 + (스텟.가산3강 + 스텟.가산3강2) * 0.001 + 특수가산)
+  const p2 = Math.min(0.95, base / 10  + (스텟.가산2강 + 스텟.가산2강2) * 0.001 + 특수가산)
+  const p1 = Math.min(0.95, base       + (스텟.가산1강 + 스텟.가산1강2) * 0.001 + 특수가산 + 외부p1)
   if (r < p3) return 3
   if (r < p3 + p2) return 2
   if (r < p3 + p2 + p1) return 1
@@ -203,12 +201,15 @@ function 강화비용(단계: number) {
   return 30 + 단계 * 20
 }
 
-// 강화 실패 페널티: 항상 파괴 (파괴방지로 방지 가능)
+// 강화 실패 페널티: 항상 파괴 (40~49강만 파괴방지 적용 — 신규 사양)
 // 파괴방지: 포인트당 0.1% 파괴방지율, 최대 95%
 function 강화실패결과(lv: number, 파괴방지: number = 0): { 감소: number; 파괴: boolean } {
   if (lv <= 5) return { 감소: 0, 파괴: false }  // 5강 이하 안전
-  const 방지율 = Math.min(0.95, 파괴방지 * 0.001)
-  if (Math.random() < 방지율) return { 감소: 0, 파괴: false }  // 파괴방지 성공
+  // 파괴방지는 40~49강 강화 실패에만 적용
+  if (lv >= 40 && lv <= 49) {
+    const 방지율 = Math.min(0.95, 파괴방지 * 0.001)
+    if (Math.random() < 방지율) return { 감소: 0, 파괴: false }
+  }
   return { 감소: 0, 파괴: true }  // 파괴
 }
 
@@ -1246,6 +1247,10 @@ export default function App() {
         set최고DPS(huntingDPS)
       }
       const currentBatch = 자원배수(Math.max(huntingDPS, 최고DPSRef.current)) * (1 + 보주배수)
+      // 사냥터 곱셈 보너스: (1 + 재물보석×10%) × (1 + 각성×10%)
+      const _재물 = 보석Ref.current.재물 || 0
+      const _각성 = 각성의보석Ref.current || 0
+      const 사냥터곱셈 = (1 + _재물 * 0.1) * (1 + _각성 * 0.1)
       const 보스게이트 = 보스DPS게이트(보스처치수Ref.current + 1)
 
       // 필드 경계 클램프
@@ -1524,11 +1529,12 @@ export default function App() {
               n.공격플래시Until = now + 150
               const isCrit = Math.random() < 평균크리
               const dmg = 공격력(n.lv, 초월s, 스텟.유닛공업) * 공격력배수 * 연타수(n.lv) * (isCrit ? 2 : 1)
-              // 티어별 보상 배수: 1=×1 mineral, 2=×3 mineral, 3=×6 mineral+credit (DPS측정기)
+              // 사냥터 단가 (xlsx 신규): Lv1=1원/dmg, Lv2=10만원/dmg, Lv3=100억원/dmg
               const tier = target.티어
-              const tierMul = tier === 1 ? 1 : tier === 2 ? 3 : 6
-              추가미네랄 += dmg * 1.5 * tierMul * currentBatch * 자원배수기여
-              // 사냥터 3 (DPS측정기) → 크레딧 소량 부가 획득 (dmg / 1000)
+              const 단가 = tier === 1 ? 1 : tier === 2 ? 100000 : 10000000000
+              // 사냥터 곱셈 보너스 (재물보석/각성) × 기존 배수
+              추가미네랄 += dmg * 단가 * 사냥터곱셈 * currentBatch * 자원배수기여
+              // 사냥터 3 → 크레딧 소량 부가 (기존 유지)
               if (tier === 3) {
                 추가크레딧 += Math.max(1, Math.floor(dmg / 1000)) * (1 + 보석b.크레딧배수 - 1)
               }
@@ -1641,7 +1647,8 @@ export default function App() {
       // 고유유닛 DPS 기여 (사냥터 배치 상시 적용)
       if (고유DPS > 0) {
         const 고유티어 = 고유유닛스텟cur.위치
-        추가미네랄 += 고유DPS * 1.5 * 고유티어 * currentBatch * 자원배수기여 * dt
+        const 고유단가 = 고유티어 === 1 ? 1 : 고유티어 === 2 ? 100000 : 10000000000
+        추가미네랄 += 고유DPS * 고유단가 * 사냥터곱셈 * currentBatch * 자원배수기여 * dt
       }
       // 고유유닛 dest 보간 이동 (smooth)
       if (고유유닛destRef.current) {
