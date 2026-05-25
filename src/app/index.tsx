@@ -715,19 +715,12 @@ function 보석보너스합산(b: 보석목록) {
 
 // 고유유닛 업그레이드 스텟
 type 고유유닛스텟 = {
-  공격력: number   // 0~20, 강화당 공격력 +500
-  공속: number     // 0~6, 공격속도 단계
-  경험치: number   // 0~5, 강화당 경험치 +20%
-  추가1강: number  // 0~20, 강화당 +1강 확률 +0.25%
-  특수강화: number // 0~10, 강화당 특수강화 확률 +0.5%
-  위치: 1 | 2 | 3  // 사냥터 1/2/3 어느 화면에 배치할지
-  파괴방지: number // 0~200, 강화당 파괴방지 +0.1%
-  단수: number     // 1+, 각성의돌로 승단. n→n+1 비용 = n개. Lv3 배율 +10%/단, 채광력 +1/단
-  해금사냥터: number  // 1=사1만, 2=사1+2, 3=사1+2+3. 사냥터 잠금해제 비용은 크레딧
+  공격력: number; 공속: number; 경험치: number; 추가1강: number; 특수강화: number
+  위치: 1 | 2        // 사1 또는 사2 (사3은 진입 X). 26강+ 마린 존재시 자동 사2
+  파괴방지: number
+  단수: number       // 1+. n→n+1 비용=각성의보석 n개. 단수효과 = 1.1^(n-1) 곱
 }
-const 초기고유유닛: 고유유닛스텟 = { 공격력: 0, 공속: 0, 경험치: 0, 추가1강: 0, 특수강화: 0, 위치: 1, 파괴방지: 0, 단수: 1, 해금사냥터: 1 }
-// 사냥터 해금 비용 (크레딧, 1회만)
-const 사냥터해금비용: Record<number, number> = { 2: 1000, 3: 100000 }
+const 초기고유유닛: 고유유닛스텟 = { 공격력: 0, 공속: 0, 경험치: 0, 추가1강: 0, 특수강화: 0, 위치: 1, 파괴방지: 0, 단수: 1 }
 
 function 고유유닛공격력(스텟: 고유유닛스텟) { return 500 + 스텟.공격력 * 500 }
 function 고유유닛공속(스텟: 고유유닛스텟): number {
@@ -1284,7 +1277,7 @@ export default function App() {
       const _각성 = 각성의보석Ref.current || 0
       const 사냥터곱셈 = (1 + _재물 * 0.1) * (1 + _각성 * 0.1)
       // Lv3 사냥터 단수 배율: 단수 1당 +10%
-      const Lv3단수배율 = 1 + (_단수 - 1) * 0.1
+      const Lv3단수배율 = Math.pow(1.1, Math.max(0, _단수 - 1))  // 1단=1, 2단=1.1, 3단=1.21, ...
       const 보스게이트 = 보스DPS게이트(보스처치수Ref.current + 1)
 
       // 필드 경계 클램프
@@ -2131,29 +2124,19 @@ export default function App() {
     set크레딧(prev => prev - 비용)
     set고유유닛(prev => ({ ...prev, [stat]: (prev[stat] as number) + 1 }))
   }
-  // 사냥터 해금 (크레딧 소모, 1회만). 2=1000크레딧, 3=10만 크레딧
-  function 사냥터해금(target: 2 | 3) {
-    const u = 고유유닛Ref.current
-    if (u.해금사냥터 >= target) { 메시지표시(`이미 해금됨 (사${target})`); return }
-    const cost = 사냥터해금비용[target] ?? 0
-    if (크레딧 < cost) { 메시지표시(`⛔ 크레딧 부족 (필요 ${숫자포맷(cost)})`); return }
-    set크레딧(c => c - cost)
-    set고유유닛(prev => ({ ...prev, 해금사냥터: target }))
-    메시지표시(`🔓 사냥터 ${target} 해금! 💰-${숫자포맷(cost)}`)
-  }
+  // 고유유닛 사냥터 자동 라우팅: 26강+ 마린 존재시 사2, 아니면 사1. 사3 진입 X.
   function 고유유닛위치변경() {
-    const u = 고유유닛Ref.current
-    const max위치 = u.해금사냥터
-    let next: 1 | 2 | 3 = u.위치 === max위치 ? 1 : (u.위치 + 1) as 1 | 2 | 3
-    if (next > max위치) next = 1
-    set고유유닛(prev => ({ ...prev, 위치: next }))
-    메시지표시(`📍 고유유닛 → 사냥터 ${next}`)
+    // 수동 cycle 폐기 (자동 라우팅으로 대체) — 호출시 안내만
+    메시지표시('📍 고유유닛 위치는 26강+ 마린 등장시 자동 사2 이동')
   }
   // 단수업 비용: n→n+1 = n개 각성의돌 (각성의보석 자원 사용)
   function 단수업비용(현재단수: number): number { return 현재단수 }
   function 단수업가능(u: 고유유닛스텟): boolean {
-    // 모든 강화 max 달성 시
     return u.공격력 >= 20 && u.공속 >= 6 && u.경험치 >= 5 && u.추가1강 >= 20 && u.특수강화 >= 10 && u.파괴방지 >= 200
+  }
+  // 단수 배율: 1.1^(n-1) (1단=1, 2단=1.1, 3단=1.21, ...)
+  function 단수배율(단수: number): number {
+    return Math.pow(1.1, Math.max(0, 단수 - 1))
   }
 
 
@@ -2195,6 +2178,15 @@ export default function App() {
   }
 
   // ============================================
+  // 🦸 고유유닛 자동 사냥터 라우팅: 26강+ 마린 존재시 사2, 아니면 사1 (사3 진입 X)
+  useEffect(() => {
+    const has26plus = 마린들.some(m => m.lv >= 26)
+    const target: 1 | 2 = has26plus ? 2 : 1
+    if (고유유닛.위치 !== target) {
+      set고유유닛(prev => ({ ...prev, 위치: target }))
+    }
+  }, [마린들, 고유유닛.위치])
+
   // 🌟 고유유닛 자동 단수업 (모든 강화 max + 각성의돌(=각성의보석) 보유시)
   useEffect(() => {
     if (!단수업가능(고유유닛)) return
@@ -3132,11 +3124,11 @@ export default function App() {
               DPS {숫자포맷(고유DPS현재)} (공격력 {고유유닛공격력(고유유닛)} × 속도 {고유유닛공속(고유유닛).toFixed(1)})
             </Text>
             <Text style={[styles.prodSubtitle, { color: '#a855f7' }]}>
-              위치: 사냥터 {고유유닛.위치} · 해금 사{고유유닛.해금사냥터}까지
+              위치: 사냥터 {고유유닛.위치} (26강+ 마린 등장시 자동 사2, 사3 진입 X)
             </Text>
             <Text style={[styles.prodSubtitle, { color: '#ff6ad9' }]}>
-              🌟 단수 {고유유닛.단수}단 · Lv3 배율 +{((고유유닛.단수 - 1) * 10).toFixed(0)}% · 채광력 +{고유유닛.단수 - 1}
-              {단수업가능(고유유닛) ? ` · 다음 각성 💎×${단수업비용(고유유닛.단수)} (보유 ${각성의보석})` : ' · (모든 강화 MAX시 각성 가능)'}
+              🌟 단수 {고유유닛.단수}단 · Lv3 단가 ×{단수배율(고유유닛.단수).toFixed(2)} · 채광력 +{고유유닛.단수 - 1}
+              {단수업가능(고유유닛) ? ` · 다음 각성 💎×${단수업비용(고유유닛.단수)} (보유 ${각성의보석})` : ' · (모든 강화 MAX시 각성)'}
             </Text>
             <ScrollView style={{ maxHeight: 320 }}>
               {upgList.map(({ stat, 이모지, 설명, 상한 }) => {
@@ -3155,39 +3147,6 @@ export default function App() {
                       onPress={() => 고유유닛강화(stat)}
                     >
                       <Text style={styles.upgBtnText}>{maxed ? 'MAX' : `💰${숫자포맷(비용)}`}</Text>
-                    </TouchableOpacity>
-                  </View>
-                )
-              })}
-              <View style={styles.divider} />
-              <View style={styles.upgRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.upgLabel}>📍 위치 변경 <Text style={{ color: '#f5a623' }}>사냥터{고유유닛.위치}</Text></Text>
-                  <Text style={styles.upgEffect}>해금된 사냥터로 cycle (사1→{고유유닛.해금사냥터 >= 2 ? '2→' : ''}{고유유닛.해금사냥터 >= 3 ? '3→' : ''}1)</Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.upgBtn, { backgroundColor: '#4a90e2' }]}
-                  onPress={고유유닛위치변경}
-                >
-                  <Text style={styles.upgBtnText}>cycle</Text>
-                </TouchableOpacity>
-              </View>
-              {/* 사냥터 해금 (크레딧 1회 비용) */}
-              {([2, 3] as const).map(t => {
-                const cost = 사냥터해금비용[t]
-                const 해금됨 = 고유유닛.해금사냥터 >= t
-                const ok = !해금됨 && 크레딧 >= cost
-                return (
-                  <View key={t} style={styles.upgRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.upgLabel}>🔓 사냥터 {t} 해금 {해금됨 ? <Text style={{ color: '#7ed957' }}>✓ 해금됨</Text> : <Text style={{ color: '#f5a623' }}>(1회 {숫자포맷(cost)} 크레딧)</Text>}</Text>
-                      <Text style={styles.upgEffect}>{t === 2 ? '사2 입장 가능 (10만원/dmg)' : '사3 입장 가능 (100억원/dmg)'}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.upgBtn, (!ok || 해금됨) && styles.upgBtnOff, { backgroundColor: 해금됨 ? '#7ed957' : ok ? '#a855f7' : '#444' }]}
-                      onPress={() => 사냥터해금(t)}
-                    >
-                      <Text style={styles.upgBtnText}>{해금됨 ? '해금' : `💰${숫자포맷(cost)}`}</Text>
                     </TouchableOpacity>
                   </View>
                 )
