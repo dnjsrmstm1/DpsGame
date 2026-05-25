@@ -561,7 +561,7 @@ const 적_크기 = 42      // 일반 적 (보스/몹용 별도)
 const 몹_크기 = 90       // 사냥터 몹 (크게)
 const 보스_크기 = 110    // 보스 (가장 큼)
 const 공격사거리 = 180
-const 기본이동속도 = 160
+const 기본이동속도 = 280  // 사용자 요청 — 전반적 속도 상승 (160→280)
 
 // 베이스 화면: 4 꼭지점 배치 (중앙 = 마린 spawn)
 const ZONE_W = Math.min(105, (필드_W - 30) / 2)
@@ -573,7 +573,7 @@ const ZONE_판매소 = { x: 필드_W - ZONE_W - 10, y: 필드_H - ZONE_H - 10, w
 // 서브 화면 베이스 복귀 (아래쪽)
 const ZONE_베이스입구 = { x: 필드_W / 2 - 50, y: 필드_H - 60, w: 100, h: 50, label: '🏠 베이스', color: '#7ed957' }
 
-const 강화쿨다운 = 800  // 0.8초마다 자동 강화 시도
+const 강화쿨다운 = 300  // 0.3초마다 자동 강화 시도 (800→300, 사용자 요청)
 
 // ============================================
 // 타입
@@ -1089,7 +1089,7 @@ export default function App() {
   const [환생패시브, set환생패시브] = useState<Record<string, number>>({})
   const [환생패널열림, set환생패널열림] = useState(false)
   const [재화패널열림, set재화패널열림] = useState(false)
-  const [생산배수, set생산배수] = useState<number>(1)
+  const [자동구입배수, set자동구입배수] = useState<number>(1)
   // 신규 재화 (원본 맵 기반)
   // 각성의 보석: 보스/뽑기에서 드랍, 추가 Ex스탯 포인트 교환에 사용
   const [각성의보석, set각성의보석] = useState(0)
@@ -1176,6 +1176,7 @@ export default function App() {
   const [dmg플로팅들, setDmg플로팅들] = useState<Dmg플로팅[]>([])
   const dmgIdRef = useRef(0)
   const 자동구입강도Ref = useRef(자동구입강도); 자동구입강도Ref.current = 자동구입강도
+  const 자동구입배수Ref = useRef(자동구입배수); 자동구입배수Ref.current = 자동구입배수
   const 자동구입타이머Ref = useRef(0)
   const 보석연속타이머Ref = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastTapRef = useRef<{ id: number; time: number } | null>(null)
@@ -1267,6 +1268,7 @@ export default function App() {
           if (typeof d.자동판매lv === 'number') set자동판매lv(Math.max(15, d.자동판매lv))
           if (typeof d.자동구입강도 === 'number') set자동구입강도(d.자동구입강도)
           if (typeof d.자동구입ON === 'boolean') set자동구입ON(d.자동구입ON)
+          if (typeof d.자동구입배수 === 'number') set자동구입배수(Math.max(1, Math.min(10, d.자동구입배수)))
           if (d.업그레이드 && typeof d.업그레이드 === 'object') set업그레이드(prev => ({ ...prev, ...d.업그레이드}))
           if (typeof d.캐릭레벨 === 'number') set캐릭레벨(d.캐릭레벨)
           if (typeof d.경험치 === 'number') set경험치(d.경험치)
@@ -1335,7 +1337,7 @@ export default function App() {
       타격수획득idx, extraVI받음, extraXI받음,
       환생레벨, 누적환생수, 환생패시브,
       누적강화성공, 누적판매, 최고마린lv,
-      자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON,
+      자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동구입배수,
       강화최초달성: Array.from(강화최초달성),
       마지막저장시간: Date.now(),
     }))
@@ -1350,7 +1352,7 @@ export default function App() {
       타격수획득idx, extraVI받음, extraXI받음,
       환생레벨, 누적환생수, 환생패시브,
       누적강화성공, 누적판매, 최고마린lv,
-      자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 로드완료])
+      자동강화ON, 자동강화최대lv, 자동판매ON, 자동판매lv, 자동구입강도, 자동구입ON, 자동구입배수, 로드완료])
 
   // ============================================
   // 게임 루프
@@ -1397,7 +1399,7 @@ export default function App() {
       const 공격력배수 = (1 + 보주공격 + upg.공격력 * 0.03) * 보스공격력보너스  // 유닛공업은 공격력() 내부에서 처리
       const 공속배수 = 1 + 보주공속 + upg.공속 * 0.02
       const 자원배수기여 = (1 + 보주자원 + upg.자원 * 0.05 + 스텟.돈수급량 * 0.03 + 보석b.자원배수추가) * (1 + 보주배수)
-      const 속도 = Math.min(450, 기본이동속도 * (1 + 보주이속 + upg.이속 * 0.03))
+      const 속도 = Math.min(700, 기본이동속도 * (1 + 보주이속 + upg.이속 * 0.03))
       const 보스존캡 = 8
       const 사냥터캡 = 12 + Math.min(보스처치수Ref.current, 10) * 4
       const 평균크리 = Math.min(0.95, 보주크리)
@@ -1852,18 +1854,23 @@ export default function App() {
       const finalMarines = newMarines.filter(m => m.id !== -1 && !융합소모IDs.has(m.id))
       set마린들(finalMarines)
 
-      // 자동 구입 (총 마린 200 미만). 자동판매와 lv 동일해도 OK → 구입 후 다음 tick에 자동판매가 처리
+      // 자동 구입 (총 마린 200 미만). 배수만큼 한 tick에 일괄 구입
       const 총마린수예상 = currentMarines.length - 판매수집.length
       if (자동구입ONRef.current && now - 자동구입타이머Ref.current >= 50 && 총마린수예상 < 200) {
         const lv = 자동구입강도Ref.current
         const cost = 생산비용(lv)
+        const 배수 = 자동구입배수Ref.current
         const 가용 = 잔여Mineral + 추가미네랄
-        if (가용 >= cost) {
+        const 슬롯여유 = 200 - 총마린수예상
+        const 구입가능 = Math.min(배수, 슬롯여유, Math.floor(가용 / cost))
+        if (구입가능 > 0) {
           자동구입타이머Ref.current = now
-          잔여Mineral -= cost
+          잔여Mineral -= cost * 구입가능
           set마린들(prev => {
-            const baseCount = prev.filter(m => m.location === 'base').length
-            return [...prev, 새마린(lv, 베이스시작위치(baseCount), 'base')]
+            let bc = prev.filter(m => m.location === 'base').length
+            const 추가: 마린[] = []
+            for (let i = 0; i < 구입가능; i++) 추가.push(새마린(lv, 베이스시작위치(bc + i), 'base'))
+            return [...prev, ...추가]
           })
         }
       }
@@ -3569,11 +3576,18 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          {자동판매ON && 자동구입ON && 자동구입강도 === 자동판매lv && (
-            <Text style={{ color: '#e94560', fontSize: 11, marginTop: 4 }}>
-              ⚠️ 구입 lv = 판매 lv → 구입 스킵
-            </Text>
-          )}
+          {/* 자동 구입 배수 (1~10) */}
+          <View style={styles.sliderRow}>
+            <Text style={styles.sliderLabel}>📦 배수 ×</Text>
+            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입배수(v => Math.max(1, v - 1))}>
+              <Text style={styles.sliderArrowText}>◀</Text>
+            </TouchableOpacity>
+            <Text style={styles.sliderValue}>{자동구입배수}</Text>
+            <TouchableOpacity style={styles.sliderArrow} onPress={() => set자동구입배수(v => Math.min(10, v + 1))}>
+              <Text style={styles.sliderArrowText}>▶</Text>
+            </TouchableOpacity>
+            <Text style={{ color: '#aaa', fontSize: 10 }}>tick당 {자동구입배수}마리</Text>
+          </View>
         </View>
       )}
 
@@ -3586,32 +3600,19 @@ export default function App() {
               <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.prodSubtitle}>강도 선택 → 구매. 배수 토글로 일괄 구매 가능</Text>
-          {/* 배수 선택 */}
-          <View style={{ flexDirection: 'row', gap: 4, marginBottom: 6 }}>
-            {[1, 5, 10].map(n => (
-              <TouchableOpacity
-                key={n}
-                style={[styles.statTabBtn, 생산배수 === n && styles.statTabBtnOn]}
-                onPress={() => set생산배수(n)}
-              >
-                <Text style={[styles.statTabText, 생산배수 === n && { color: '#000' }]}>×{n}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={styles.prodSubtitle}>강도 선택 → 구매</Text>
           <View style={styles.prodGrid}>
             {생산강도목록.map(강도 => {
               const 단가 = 생산비용(강도)
-              const 총 = 단가 * 생산배수
               const 가능 = mineral >= 단가
               return (
                 <TouchableOpacity
                   key={강도}
                   style={[styles.prodBtn, !가능 && styles.prodBtnDisabled]}
-                  onPress={() => 유닛구매(강도, 생산배수)}
+                  onPress={() => 유닛구매(강도, 1)}
                 >
-                  <Text style={styles.prodBtnLv}>+{강도}{생산배수 > 1 ? ` ×${생산배수}` : ''}</Text>
-                  <Text style={styles.prodBtnCost}>{숫자포맷(총)}</Text>
+                  <Text style={styles.prodBtnLv}>+{강도}</Text>
+                  <Text style={styles.prodBtnCost}>{숫자포맷(단가)}</Text>
                 </TouchableOpacity>
               )
             })}
