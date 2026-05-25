@@ -675,6 +675,44 @@ const 보석max: Record<보석타입, number> = {
 function 보석현재비용(종류: 보석타입, 보유: number): number {
   return Math.floor(보석구입비용[종류] * (1 + 보유 / 10))
 }
+// 크리스탈 레벨업 비용 (보유 N개 소모 → 레벨 +1)
+// 등급별 max 레벨: 노말/레어=10, 유니크/퀘이사=20, 갤럭시/오리진=50
+type 크리스탈등급 = '노말' | '레어' | '유니크' | '갤럭시' | '퀘이사' | '오리진'
+const _레벨업표A = [1, 3, 5, 7, 10, 13, 17, 22, 30, 40]  // 1~10: 노말/레어/유니크/갤럭시/퀘이사 공통
+const _레벨업표B = [1000, 4000, 10000, 20000, 33000, 50000, 100000, 300000, 500000, 1000000]  // 11~20: 우주/백색/흑색/오리진
+const _레벨업표C = [250, 850, 2530, 5690, 10360, 21130, 46500, 100500, 235800, 500000]  // 11~20: 퀘이사
+const _레벨업표D = [5, 15, 60, 250, 400, 750, 1250, 2500, 5000, 10000]  // 1~10: 오리진
+const _레벨업표E = [7, 20, 60, 350, 650, 1200, 1800, 3000, 5000, 10000]  // 21~30: 우주
+const _레벨업표F = [15000, 24500, 45000, 90000, 180000, 350000, 700000, 1500000, 3000000, 6000000,
+                  12500000, 15000000, 30000000, 60000000, 1.2e8, 2.5e8, 5e8, 1e9, 2e9, 4e9]  // 31~50: 우주/오리진
+const 크리스탈등급max: Record<크리스탈등급, number> = { 노말: 10, 레어: 10, 유니크: 20, 갤럭시: 50, 퀘이사: 20, 오리진: 50 }
+function 크리스탈레벨업비용(등급: 크리스탈등급, 현재lv: number): number {
+  // 현재lv -> lv+1 비용 (현재lv 1~max-1 유효)
+  const idx = 현재lv - 1
+  if (등급 === '오리진') {
+    if (현재lv <= 10) return _레벨업표D[idx]
+    if (현재lv <= 20) return _레벨업표B[idx - 10]
+    if (현재lv <= 30) return _레벨업표E[idx - 20]
+    if (현재lv <= 50) return _레벨업표F[idx - 30]
+    return Infinity
+  }
+  if (현재lv <= 10) return _레벨업표A[idx]
+  if (등급 === '퀘이사' && 현재lv <= 20) return _레벨업표C[idx - 10]
+  if ((등급 === '유니크' || 등급 === '갤럭시') && 현재lv <= 20) return _레벨업표B[idx - 10]
+  if (등급 === '갤럭시' && 현재lv <= 30) return _레벨업표E[idx - 20]
+  if (등급 === '갤럭시' && 현재lv <= 50) return _레벨업표F[idx - 30]
+  return Infinity
+}
+// 크리스탈 key → 등급 매핑
+const 크리스탈등급맵: Record<keyof 명칭크리스탈목록, 크리스탈등급> = {
+  방어: '노말', 행운: '노말', 경험: '노말', 무력: '노말', 절약: '노말', 총명: '노말', 보호: '노말', 각성: '노말',
+  홍색: '레어', 주황: '레어', 노랑: '레어', 초록: '레어', 파랑: '레어', 남색: '레어', 보라: '레어', 하늘색: '레어', 무색명칭: '레어',
+  흑색: '유니크', 백색명칭: '유니크',
+  우주: '갤럭시',
+  길운Q: '퀘이사', 무구Q: '퀘이사', 집중Q: '퀘이사', 절제Q: '퀘이사', 탐욕Q: '퀘이사', 증식Q: '퀘이사', 미래Q: '퀘이사', 돌파Q: '퀘이사',
+  창조O: '오리진', 파멸O: '오리진',
+}
+
 // 명칭 크리스탈 max 값. xlsx 퀘이사 명시 + 기타는 추정
 const 명칭크리스탈max: Partial<Record<keyof 명칭크리스탈목록, number>> = {
   // 노말 (구입 없음 — 박스 드랍만, 그래도 효과 max 제한)
@@ -931,6 +969,8 @@ export default function App() {
   const [초월스텟, set초월스텟] = useState<초월스텟타입>({ ...초기초월스텟 })
   const [스텟탭, set스텟탭] = useState<'일반' | '초월' | '보주' | '보석'>('일반')
   const [명칭크리스탈, set명칭크리스탈] = useState<명칭크리스탈목록>(() => ({ ...초기명칭크리스탈 }))
+  // 크리스탈 레벨 (기본 0 = 미보유, 1+ = 레벨)
+  const [명칭크리스탈Lv, set명칭크리스탈Lv] = useState<Partial<Record<keyof 명칭크리스탈목록, number>>>({})
   const [장착크리스탈, set장착크리스탈] = useState<(keyof 명칭크리스탈목록)[]>([])
   const [명칭크리스탈패널열림, set명칭크리스탈패널열림] = useState(false)
   const [명칭크리스탈탭, set명칭크리스탈탭] = useState<'노말' | '레어' | '유니크' | '갤럭시' | '퀘이사' | '오리진'>('노말')
@@ -1145,6 +1185,7 @@ export default function App() {
           }
           if (d.명칭크리스탈 && typeof d.명칭크리스탈 === 'object') set명칭크리스탈(prev => ({ ...prev, ...d.명칭크리스탈 }))
           if (Array.isArray(d.장착크리스탈)) set장착크리스탈(d.장착크리스탈)
+          if (d.명칭크리스탈Lv && typeof d.명칭크리스탈Lv === 'object') set명칭크리스탈Lv(d.명칭크리스탈Lv)
           if (typeof d.크레딧 === 'number') set크레딧(d.크레딧)
           if (d.보석 && typeof d.보석 === 'object') set보석(prev => ({ ...prev, ...d.보석 }))
           if (d.고유유닛 && typeof d.고유유닛 === 'object') set고유유닛(prev => ({ ...prev, ...d.고유유닛 }))
@@ -1191,7 +1232,7 @@ export default function App() {
       보주,
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
-      일반스텟, 초월스텟, 명칭크리스탈, 장착크리스탈,
+      일반스텟, 초월스텟, 명칭크리스탈, 명칭크리스탈Lv, 장착크리스탈,
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
       각성의보석, ExPoint, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
@@ -1205,7 +1246,7 @@ export default function App() {
       보주,
       업그레이드,
       캐릭레벨, 경험치, 잔여포인트,
-      일반스텟, 초월스텟, 명칭크리스탈, 장착크리스탈,
+      일반스텟, 초월스텟, 명칭크리스탈, 명칭크리스탈Lv, 장착크리스탈,
       크레딧, 보석, 고유유닛, 초월레벨, 초월잔여포인트,
       각성의보석, ExPoint, 은하조각, 자각보주,
       타격수획득idx, extraVI받음, extraXI받음,
@@ -2011,6 +2052,7 @@ export default function App() {
     if (!타격수유지) set타격수획득idx(0)
     setExtraVI받음(0); setExtraXI받음(0)
     set명칭크리스탈({ ...초기명칭크리스탈 })
+    set명칭크리스탈Lv({})
     set장착크리스탈([])
     set크레딧(유지_크레딧)
     set보석({ ...초기보석 })
@@ -2137,6 +2179,25 @@ export default function App() {
   // 단수 배율: 1.1^(n-1) (1단=1, 2단=1.1, 3단=1.21, ...)
   function 단수배율(단수: number): number {
     return Math.pow(1.1, Math.max(0, 단수 - 1))
+  }
+  // 크리스탈 레벨업 (같은 종류 N개 소모 → 레벨 +1)
+  function 크리스탈레벨업(key: keyof 명칭크리스탈목록) {
+    const 등급 = 크리스탈등급맵[key]
+    const max = 크리스탈등급max[등급]
+    const curLv = 명칭크리스탈Lv[key] ?? 0
+    // 첫 획득(보유는 있는데 lv 0)은 자동 lv 1로 표시. 이후 lv→lv+1 비용 소모
+    if (curLv === 0) {
+      if (명칭크리스탈Ref.current[key] < 1) { 메시지표시('보유 없음 — 박스로 획득'); return }
+      set명칭크리스탈Lv(prev => ({ ...prev, [key]: 1 }))
+      메시지표시(`🌟 ${key} Lv.1 활성화`)
+      return
+    }
+    if (curLv >= max) { 메시지표시(`⛔ Lv.${max} MAX`); return }
+    const cost = 크리스탈레벨업비용(등급, curLv)
+    if (명칭크리스탈Ref.current[key] < cost) { 메시지표시(`재료 부족 (필요 ${숫자포맷(cost)}개)`); return }
+    set명칭크리스탈(prev => ({ ...prev, [key]: (prev[key] as number) - cost }))
+    set명칭크리스탈Lv(prev => ({ ...prev, [key]: curLv + 1 }))
+    메시지표시(`✨ ${key} Lv.${curLv} → ${curLv + 1}`)
   }
 
 
@@ -2381,6 +2442,7 @@ export default function App() {
     set각성의보석(0); setExPoint(0); set은하조각(0); set자각보주(0)
     set타격수획득idx(0); setExtraVI받음(0); setExtraXI받음(0)
     set명칭크리스탈({ ...초기명칭크리스탈 })
+    set명칭크리스탈Lv({})
     set장착크리스탈([])
     set크레딧(0)
     set보석({ ...초기보석 })
@@ -3069,29 +3131,44 @@ export default function App() {
                 const 장착됨 = 장착크리스탈.includes(info.키)
                 const 보유 = 현재수 > 0
                 const 슬롯가득 = !장착됨 && 장착수 >= 슬롯수
+                const 등급 = 크리스탈등급맵[info.키]
+                const lv = 명칭크리스탈Lv[info.키] ?? 0
+                const lvMax = 크리스탈등급max[등급]
+                const lv업비용 = lv === 0 ? 1 : (lv < lvMax ? 크리스탈레벨업비용(등급, lv) : 0)
+                const lv업가능 = lv < lvMax && 현재수 >= lv업비용
                 return (
                   <View key={info.키} style={[styles.upgRow, { borderLeftWidth: 3, borderLeftColor: info.색상, paddingLeft: 8, opacity: 보유 ? 1 : 0.4 }]}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.upgLabel, { color: info.색상 }]}>{info.이름} <Text style={{ color: '#f5a623' }}>{현재수}/{명칭크리스탈max[info.키] ?? 100}</Text>{장착됨 ? ' 🟢장착' : ''}</Text>
+                      <Text style={[styles.upgLabel, { color: info.색상 }]}>
+                        {info.이름} <Text style={{ color: '#f5a623' }}>Lv.{lv}/{lvMax}</Text> <Text style={{ color: '#888', fontSize: 9 }}>(재료 {현재수})</Text>{장착됨 ? ' 🟢' : ''}
+                      </Text>
                       <Text style={[styles.upgEffect, { color: '#ccc' }]}>{info.효과}</Text>
                     </View>
-                    <TouchableOpacity
-                      style={[styles.upgBtn, (!보유 || 슬롯가득) && !장착됨 && styles.upgBtnOff, { backgroundColor: 장착됨 ? '#7ed957' : 슬롯가득 ? '#444' : '#3a5a8a' }]}
-                      onPress={() => {
-                        if (!보유) { 메시지표시('보유 없음 — 51강+ 판매로 획득'); return }
-                        if (장착됨) {
-                          set장착크리스탈(prev => prev.filter(k => k !== info.키))
-                          메시지표시(`🟢 ${info.이름} 해제`)
-                        } else if (슬롯가득) {
-                          메시지표시(`슬롯 가득 (${슬롯수}/${슬롯수}) — 초월레벨 올려야 함`)
-                        } else {
-                          set장착크리스탈(prev => [...prev, info.키])
-                          메시지표시(`🟢 ${info.이름} 장착 (${장착수 + 1}/${슬롯수})`)
-                        }
-                      }}
-                    >
-                      <Text style={[styles.upgBtnText, { color: 장착됨 ? '#000' : '#fff' }]}>{장착됨 ? '해제' : 슬롯가득 ? '🔒' : '장착'}</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 3 }}>
+                      <TouchableOpacity
+                        style={[styles.upgBtn, !lv업가능 && styles.upgBtnOff, { backgroundColor: lv업가능 ? '#f5a623' : '#444', minWidth: 60, paddingHorizontal: 4 }]}
+                        onPress={() => 크리스탈레벨업(info.키)}
+                        disabled={lv >= lvMax}
+                      >
+                        <Text style={[styles.upgBtnText, { fontSize: 9 }]}>{lv >= lvMax ? 'MAX' : (lv === 0 ? '활성' : `+1`)}</Text>
+                        {lv < lvMax && lv > 0 && <Text style={[styles.upgBtnText, { fontSize: 8, color: '#fff' }]}>×{숫자포맷(lv업비용)}</Text>}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.upgBtn, (!보유 || 슬롯가득) && !장착됨 && styles.upgBtnOff, { backgroundColor: 장착됨 ? '#7ed957' : 슬롯가득 ? '#444' : '#3a5a8a', minWidth: 50 }]}
+                        onPress={() => {
+                          if (!보유) { 메시지표시('보유 없음'); return }
+                          if (장착됨) {
+                            set장착크리스탈(prev => prev.filter(k => k !== info.키))
+                          } else if (슬롯가득) {
+                            메시지표시(`슬롯 가득 (${슬롯수}/${슬롯수})`)
+                          } else {
+                            set장착크리스탈(prev => [...prev, info.키])
+                          }
+                        }}
+                      >
+                        <Text style={[styles.upgBtnText, { color: 장착됨 ? '#000' : '#fff', fontSize: 10 }]}>{장착됨 ? '해제' : 슬롯가득 ? '🔒' : '장착'}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 )
               })}
