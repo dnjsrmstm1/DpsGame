@@ -1012,6 +1012,7 @@ export default function App() {
   // 패시브: id → 구입 레벨
   const [환생패시브, set환생패시브] = useState<Record<string, number>>({})
   const [환생패널열림, set환생패널열림] = useState(false)
+  const [재화패널열림, set재화패널열림] = useState(false)
   // 신규 재화 (원본 맵 기반)
   // 각성의 보석: 보스/뽑기에서 드랍, 추가 Ex스탯 포인트 교환에 사용
   const [각성의보석, set각성의보석] = useState(0)
@@ -2112,6 +2113,22 @@ export default function App() {
     set무색조각(prev => prev - 비용)
     set보석(prev => ({ ...prev, [종류]: prev[종류] + 1 }))
   }
+  // N개 일괄 구입 (가능한 만큼)
+  function 보석구입N(종류: 보석타입, 횟수: number) {
+    let 보유 = 보석Ref.current[종류]
+    let 잔여 = 무색조각Ref.current
+    const max = 보석max[종류]
+    let 산횟수 = 0, 총비용 = 0
+    for (let i = 0; i < 횟수; i++) {
+      if (보유 >= max) break
+      const cost = 보석현재비용(종류, 보유)
+      if (잔여 < cost) break
+      잔여 -= cost; 총비용 += cost; 보유++; 산횟수++
+    }
+    if (산횟수 === 0) { 메시지표시(`🔷 무색조각 ${숫자포맷(보석현재비용(종류, 보유))} 필요`); return }
+    set무색조각(prev => prev - 총비용)
+    set보석(prev => ({ ...prev, [종류]: prev[종류] + 산횟수 }))
+  }
 
   function 보석연속시작(종류: 보석타입) {
     보석구입(종류)
@@ -2465,24 +2482,28 @@ export default function App() {
       <View style={styles.statBox}>
         <View style={styles.statRow}>
           <Text style={styles.stat}>💎 {숫자포맷(mineral)}</Text>
-          <Text style={styles.statResource}>🔷 {숫자포맷(무색조각)}</Text>
-          <Text style={styles.statResource}>💠 {숫자포맷(응무조)}</Text>
-        </View>
-        <View style={styles.statRow}>
-          <Text style={styles.statBatch}>× {현재배수}</Text>
-          <Text style={styles.statSmall}>📈 {숫자포맷(시간당미네랄)}/h</Text>
-          <Text style={styles.statSmall}>🔮 {숫자포맷(크리스탈조각)}</Text>
+          <Text style={styles.statSmall}>🎯 {숫자포맷(총공격수)}</Text>
           <Text style={[styles.statSmall, { color: 잔여포인트 > 0 ? '#f5a623' : '#aaa' }]}>Lv.{캐릭레벨}{잔여포인트 > 0 ? ` (+${잔여포인트}P)` : ''}</Text>
-          {초월레벨 > 0 && <Text style={[styles.statSmall, { color: '#a855f7' }]}>🌀초월Lv.{초월레벨}{초월잔여포인트 > 0 ? ` (+${초월잔여포인트}P)` : ''}</Text>}
-          {환생레벨 > 0 && <Text style={[styles.statSmall, { color: '#ff6ad9' }]}>🌟환생Lv.{환생레벨}</Text>}
-          {크레딧 > 0 && <Text style={[styles.statSmall, { color: '#f5a623' }]}>💰 {숫자포맷(크레딧)}크레딧</Text>}
+          <TouchableOpacity onPress={() => set재화패널열림(v => !v)} style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#3a5a8a', borderRadius: 4 }}>
+            <Text style={[styles.statSmall, { color: '#fff' }]}>💰 재화</Text>
+          </TouchableOpacity>
         </View>
-        {(각성의보석 > 0 || ExPoint > 0 || 은하조각 > 0 || 자각보주 > 0) && (
-          <View style={styles.statRow}>
-            {각성의보석 > 0 && <Text style={[styles.statSmall, { color: '#ff6ad9' }]}>💎 {숫자포맷(각성의보석)} 각성</Text>}
-            {ExPoint > 0 && <Text style={[styles.statSmall, { color: '#a855f7' }]}>⭐ {숫자포맷(ExPoint)} ExP</Text>}
-            {은하조각 > 0 && <Text style={[styles.statSmall, { color: '#4ec9ff' }]}>🌌 {숫자포맷(은하조각)} 은하</Text>}
-            {자각보주 > 0 && <Text style={[styles.statSmall, { color: '#f5a623' }]}>🔯 {숫자포맷(자각보주)} 자각</Text>}
+        {재화패널열림 && (
+          <View style={{ marginTop: 6, padding: 6, backgroundColor: '#1a2030', borderRadius: 4, borderWidth: 1, borderColor: '#3a5a8a' }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Text style={[styles.statSmall, { color: '#f5a623' }]}>📊 일반 스텟P: {숫자포맷(잔여포인트)}</Text>
+              <Text style={[styles.statSmall, { color: '#a855f7' }]}>🌀 초월 스텟P: {숫자포맷(초월잔여포인트)}</Text>
+              <Text style={[styles.statSmall, { color: '#4ec9ff' }]}>🔷 무색조각: {숫자포맷(무색조각)}</Text>
+              <Text style={[styles.statSmall, { color: '#7ed957' }]}>💠 응무조: {숫자포맷(응무조)}</Text>
+              <Text style={[styles.statSmall, { color: '#ff6ad9' }]}>💎 각성석: {숫자포맷(각성의보석)}</Text>
+              <Text style={[styles.statSmall, { color: '#9b59b6' }]}>🔮 크리스탈조각: {숫자포맷(크리스탈조각)}</Text>
+              <Text style={[styles.statSmall, { color: '#f5a623' }]}>💰 크레딧: {숫자포맷(크레딧)}</Text>
+              <Text style={[styles.statSmall, { color: '#a855f7' }]}>⭐ ExPoint: {숫자포맷(ExPoint)}</Text>
+              {은하조각 > 0 && <Text style={[styles.statSmall, { color: '#4ec9ff' }]}>🌌 은하: {숫자포맷(은하조각)}</Text>}
+              {자각보주 > 0 && <Text style={[styles.statSmall, { color: '#f5a623' }]}>🔯 자각: {숫자포맷(자각보주)}</Text>}
+              {초월레벨 > 0 && <Text style={[styles.statSmall, { color: '#a855f7' }]}>🌀 초월Lv.{초월레벨}</Text>}
+              {환생레벨 > 0 && <Text style={[styles.statSmall, { color: '#ff6ad9' }]}>🌟 환생Lv.{환생레벨}</Text>}
+            </View>
           </View>
         )}
       </View>
@@ -2899,11 +2920,13 @@ export default function App() {
                   <Text style={styles.statVal}>
                     {val}/{meta.max} <Text style={{ color: '#aaa', fontSize: 9 }}>({meta.효과(val)} · {meta.cost}P)</Text>
                   </Text>
-                  <TouchableOpacity style={[styles.statBtn, !ok && styles.statBtnOff]} onPress={() => 스탯올리기(meta.key, 1)}>
-                    <Text style={styles.statBtnText}>{maxed ? 'MAX' : '+'}</Text>
-                  </TouchableOpacity>
+                  {[1, 10, 100].map(n => (
+                    <TouchableOpacity key={n} style={[styles.statBtn, !ok && styles.statBtnOff, { marginLeft: 2 }]} onPress={() => 스탯올리기(meta.key, n)}>
+                      <Text style={[styles.statBtnText, { fontSize: 10 }]}>{maxed ? '' : `+${n}`}</Text>
+                    </TouchableOpacity>
+                  ))}
                   <TouchableOpacity style={[styles.statBtn, { backgroundColor: ok ? '#7ed957' : '#444', marginLeft: 4 }]} onPress={() => 스탯올리기(meta.key, 999999)}>
-                    <Text style={[styles.statBtnText, { color: ok ? '#000' : '#888', fontSize: 10 }]}>ALL</Text>
+                    <Text style={[styles.statBtnText, { color: ok ? '#000' : '#888', fontSize: 10 }]}>{maxed ? 'MAX' : 'ALL'}</Text>
                   </TouchableOpacity>
                 </View>
               )
@@ -2982,14 +3005,19 @@ export default function App() {
                           <Text style={styles.upgLabel}>{이모지} {설명} <Text style={{ color: '#f5a623' }}>{보유}/{한도}</Text></Text>
                           <Text style={styles.upgEffect}>{효과}</Text>
                         </View>
-                        <TouchableOpacity
-                          style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 80 }]}
-                          onPressIn={() => !maxed && 보석연속시작(종류)}
-                          onPressOut={보석연속종료}
-                          disabled={maxed}
-                        >
-                          <Text style={styles.upgBtnText}>{maxed ? 'MAX' : `🔷${숫자포맷(비용)}`}</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 3 }}>
+                          {[1, 10, 100].map(n => (
+                            <TouchableOpacity
+                              key={n}
+                              style={[styles.upgBtn, !ok && styles.upgBtnOff, { minWidth: 40, paddingHorizontal: 4 }]}
+                              onPress={() => !maxed && 보석구입N(종류, n)}
+                              disabled={maxed}
+                            >
+                              <Text style={[styles.upgBtnText, { fontSize: 10 }]}>{maxed ? 'MAX' : `+${n}`}</Text>
+                              {!maxed && n === 1 && <Text style={[styles.upgBtnText, { fontSize: 8, color: '#bbb' }]}>🔷{숫자포맷(비용)}</Text>}
+                            </TouchableOpacity>
+                          ))}
+                        </View>
                       </View>
                     )
                   })}
@@ -3016,11 +3044,13 @@ export default function App() {
                           <Text style={styles.statVal}>
                             {val}/{meta.max} <Text style={{ color: '#aaa', fontSize: 9 }}>({meta.효과(val)} · {meta.cost}P)</Text>
                           </Text>
-                          <TouchableOpacity style={[styles.statBtn, !ok && styles.statBtnOff]} onPress={() => 초월스탯올리기(meta.key, 1)}>
-                            <Text style={styles.statBtnText}>{maxed ? 'MAX' : '+'}</Text>
-                          </TouchableOpacity>
+                          {[1, 10, 100].map(n => (
+                            <TouchableOpacity key={n} style={[styles.statBtn, !ok && styles.statBtnOff, { marginLeft: 2 }]} onPress={() => 초월스탯올리기(meta.key, n)}>
+                              <Text style={[styles.statBtnText, { fontSize: 10 }]}>{maxed ? '' : `+${n}`}</Text>
+                            </TouchableOpacity>
+                          ))}
                           <TouchableOpacity style={[styles.statBtn, { backgroundColor: ok ? '#7ed957' : '#444', marginLeft: 4 }]} onPress={() => 초월스탯올리기(meta.key, 999999)}>
-                            <Text style={[styles.statBtnText, { color: ok ? '#000' : '#888', fontSize: 10 }]}>ALL</Text>
+                            <Text style={[styles.statBtnText, { color: ok ? '#000' : '#888', fontSize: 10 }]}>{maxed ? 'MAX' : 'ALL'}</Text>
                           </TouchableOpacity>
                         </View>
                       )
